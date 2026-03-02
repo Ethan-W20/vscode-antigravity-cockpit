@@ -25,14 +25,12 @@
     let currentConfig = {};
     let isInitialLoading = true;
     let actionMessageTimer = null;
-    let renderToken = 0;
     let lastRenderOrder = [];
     let lastRenderViewMode = viewMode;
     let refreshCooldownTimer = null;
     const REFRESH_COOLDOWN_SECONDS = 10;
     let refreshAllLabel = '';
     let toolsConnected = false;
-    const RENDER_BATCH_SIZE = 1;
 
     const elements = {
         backBtn: document.getElementById('ao-back-btn'),
@@ -565,13 +563,6 @@
         `;
     }
 
-    function escapeCss(value) {
-        if (window.CSS && typeof window.CSS.escape === 'function') {
-            return window.CSS.escape(value);
-        }
-        return value.replace(/["\\]/g, '\\$&');
-    }
-
     function getRenderOrder(items) {
         return items.map(item => item.email);
     }
@@ -588,16 +579,39 @@
         return true;
     }
 
-    function patchRender(container, items, renderer) {
+    function parseRenderNode(html, useTableContext) {
+        const markup = String(html || '').trim();
+        if (!markup) {
+            return null;
+        }
+        if (useTableContext) {
+            const table = document.createElement('table');
+            const tbody = document.createElement('tbody');
+            table.appendChild(tbody);
+            tbody.innerHTML = markup;
+            return tbody.firstElementChild;
+        }
+        const template = document.createElement('template');
+        template.innerHTML = markup;
+        return template.content.firstElementChild;
+    }
+
+    function findRenderedItem(container, email) {
+        for (const child of container.children) {
+            if (child.getAttribute('data-email') === email) {
+                return child;
+            }
+        }
+        return null;
+    }
+
+    function patchRender(container, items, renderer, useTableContext = false) {
         for (const account of items) {
-            const selector = `[data-email="${escapeCss(account.email)}"]`;
-            const existing = container.querySelector(selector);
+            const existing = findRenderedItem(container, account.email);
             if (!existing) {
                 return false;
             }
-            const html = renderer(account);
-            const parsed = new DOMParser().parseFromString(html, 'text/html');
-            const replacement = parsed.body.firstElementChild;
+            const replacement = parseRenderNode(renderer(account), useTableContext);
             if (!replacement) {
                 return false;
             }
@@ -607,7 +621,6 @@
     }
 
     function render() {
-        renderToken += 1;
         updateSortOptions();
         updateFilterOptions();
 
@@ -682,7 +695,8 @@
 
         if (canPatch) {
             const target = viewMode === 'list' ? elements.accountsTbody : elements.accountsGrid;
-            if (patchRender(target, filteredAccounts, viewMode === 'list' ? renderAccountRow : renderAccountCard)) {
+            const useTableContext = viewMode === 'list';
+            if (patchRender(target, filteredAccounts, viewMode === 'list' ? renderAccountRow : renderAccountCard, useTableContext)) {
                 finalizeRender();
                 return;
             }
@@ -691,39 +705,17 @@
         elements.accountsGrid.classList.add('hidden');
         elements.accountsTable.classList.add('hidden');
 
-        const renderIncrementally = (container, items, renderer) => {
-            const token = renderToken;
-            let index = 0;
-            container.innerHTML = '';
-
-            const step = () => {
-                if (token !== renderToken) return;
-                let html = '';
-                let count = 0;
-                while (index < items.length && count < RENDER_BATCH_SIZE) {
-                    html += renderer(items[index]);
-                    index += 1;
-                    count += 1;
-                }
-                if (html) {
-                    container.insertAdjacentHTML('beforeend', html);
-                }
-                if (index < items.length) {
-                    requestAnimationFrame(step);
-                } else {
-                    finalizeRender();
-                }
-            };
-
-            requestAnimationFrame(step);
+        const renderFully = (container, items, renderer) => {
+            container.innerHTML = items.map(renderer).join('');
+            finalizeRender();
         };
 
         if (viewMode === 'list') {
             elements.accountsTable.classList.remove('hidden');
-            renderIncrementally(elements.accountsTbody, filteredAccounts, renderAccountRow);
+            renderFully(elements.accountsTbody, filteredAccounts, renderAccountRow);
         } else {
             elements.accountsGrid.classList.remove('hidden');
-            renderIncrementally(elements.accountsGrid, filteredAccounts, renderAccountCard);
+            renderFully(elements.accountsGrid, filteredAccounts, renderAccountCard);
         }
 
         lastRenderOrder = nextRenderOrder;

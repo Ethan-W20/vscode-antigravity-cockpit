@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.28] - 2026-03-02
+
+### Fixed
+- **Accounts list missing after tab switch (#138)**: Fixed an issue where, when Accounts Overview was in list mode, switching to another tab and back could leave rows empty (checkbox only). The list now re-renders reliably without needing to toggle from grid to list.
+
+---
+
 ## [2.1.27] - 2026-02-27
 
 ### Changed
