@@ -427,9 +427,13 @@ import { createAnnouncementModule } from './dashboard_announcements';
             const notificationCheckbox = document.getElementById('notification-enabled');
             const warningInput = document.getElementById('warning-threshold');
             const criticalInput = document.getElementById('critical-threshold');
+            const seamlessCheckbox = document.getElementById('seamless-switch-enabled');
+            const switchConfirmationCheckbox = document.getElementById('switch-confirmation');
             if (notificationCheckbox) notificationCheckbox.checked = currentConfig.notificationEnabled !== false;
             if (warningInput) warningInput.value = currentConfig.warningThreshold || 30;
             if (criticalInput) criticalInput.value = currentConfig.criticalThreshold || 10;
+            if (seamlessCheckbox) seamlessCheckbox.checked = currentConfig.seamlessSwitchEnabled !== false;
+            if (switchConfirmationCheckbox) switchConfirmationCheckbox.checked = currentConfig.switchConfirmation !== false;
 
             // Display Mode Select Logic (Webview vs QuickPick)
             const displayModeSelect = document.getElementById('display-mode-select');
@@ -516,6 +520,8 @@ import { createAnnouncementModule } from './dashboard_announcements';
         const notificationCheckbox = document.getElementById('notification-enabled');
         const warningInput = document.getElementById('warning-threshold');
         const criticalInput = document.getElementById('critical-threshold');
+        const seamlessCheckbox = document.getElementById('seamless-switch-enabled');
+        const switchConfirmationCheckbox = document.getElementById('switch-confirmation');
 
         // 通知开关即时保存
         if (notificationCheckbox) {
@@ -540,6 +546,26 @@ import { createAnnouncementModule } from './dashboard_announcements';
             criticalInput.onblur = null;
             criticalInput.addEventListener('blur', () => {
                 clampAndSaveThresholds();
+            });
+        }
+
+        if (seamlessCheckbox) {
+            seamlessCheckbox.onchange = null;
+            seamlessCheckbox.addEventListener('change', () => {
+                vscode.postMessage({
+                    command: 'updateSeamlessSwitch',
+                    enabled: seamlessCheckbox.checked
+                });
+            });
+        }
+
+        if (switchConfirmationCheckbox) {
+            switchConfirmationCheckbox.onchange = null;
+            switchConfirmationCheckbox.addEventListener('change', () => {
+                vscode.postMessage({
+                    command: 'updateSwitchConfirmation',
+                    enabled: switchConfirmationCheckbox.checked
+                });
             });
         }
     }
@@ -1868,7 +1894,12 @@ import { createAnnouncementModule } from './dashboard_announcements';
         const activeEmail = activeAccount || (accounts.length > 0 ? accounts[0].email : null);
 
         if (authUi) {
-            authUi.updateState(auth, antigravityToolsSyncEnabled, antigravityToolsAutoSwitchEnabled);
+            authUi.updateState(
+                auth,
+                antigravityToolsSyncEnabled,
+                antigravityToolsAutoSwitchEnabled,
+                currentConfig.switchConfirmation !== false,
+            );
             authUi.renderAuthRow(row, {
                 showSyncToggleInline: false,
             });
@@ -2086,7 +2117,12 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 e.stopPropagation();
                 const email = btn.dataset.email;
                 if (email) {
-                    showSwitchLoginConfirmModal(email);
+                    if (currentConfig.switchConfirmation === false) {
+                        vscode.postMessage({ command: 'autoTrigger.switchLoginAccount', email });
+                        closeAccountManageModal();
+                    } else {
+                        showSwitchLoginConfirmModal(email);
+                    }
                 }
             });
         });
@@ -2107,6 +2143,12 @@ import { createAnnouncementModule } from './dashboard_announcements';
      * 显示切换登录确认弹窗
      */
     function showSwitchLoginConfirmModal(email) {
+        if (currentConfig.switchConfirmation === false) {
+            vscode.postMessage({ command: 'autoTrigger.switchLoginAccount', email });
+            closeAccountManageModal();
+            return;
+        }
+
         // 创建确认弹窗
         let modal = document.getElementById('switch-login-confirm-modal');
         if (!modal) {
@@ -2120,9 +2162,9 @@ import { createAnnouncementModule } from './dashboard_announcements';
                         <button class="modal-close" id="switch-login-confirm-close">×</button>
                     </div>
                     <div class="modal-body" style="padding: 20px;">
-                        <p style="margin-bottom: 10px;">${i18n['autoTrigger.switchLoginConfirmText'] || '确定要切换到以下账户吗？'}</p>
+                        <p style="margin-bottom: 10px;">${i18n['autoTrigger.switchLoginConfirmText'] || '确定切换到以下账户吗？'}</p>
                         <p style="font-weight: bold; color: var(--accent-color); margin-bottom: 15px;" id="switch-login-target-email"></p>
-                        <p style="color: var(--warning-color); font-size: 0.9em;">⚠️ ${i18n['autoTrigger.switchLoginWarning'] || '此操作将重启 Antigravity 客户端以完成账户切换。'}</p>
+                        <p style="color: var(--warning-color); font-size: 0.9em;">${i18n['autoTrigger.switchLoginWarning'] || '该操作将重启 Antigravity 客户端以完成账户切换。'}</p>
                     </div>
                     <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 15px 20px;">
                         <button class="at-btn at-btn-secondary" id="switch-login-confirm-cancel">${i18n['common.cancel'] || '取消'}</button>

@@ -419,6 +419,30 @@ export class MessageController {
                     }
                     break;
 
+                case 'updateSeamlessSwitch':
+                    if (message.enabled !== undefined) {
+                        const enabled = Boolean(message.enabled);
+                        logger.info(`User changed seamless switch to: ${enabled}`);
+                        await vscode.workspace.getConfiguration('agCockpit').update(
+                            'seamlessSwitchEnabled',
+                            enabled,
+                            vscode.ConfigurationTarget.Global,
+                        );
+                    }
+                    break;
+
+                case 'updateSwitchConfirmation':
+                    if (message.enabled !== undefined) {
+                        const enabled = Boolean(message.enabled);
+                        logger.info(`User changed account-tree switch confirmation to: ${enabled}`);
+                        await vscode.workspace.getConfiguration('agCockpit').update(
+                            'switchConfirmation',
+                            enabled,
+                            vscode.ConfigurationTarget.Global,
+                        );
+                    }
+                    break;
+
                 case 'antigravityToolsSync.import':
                     await this.handleAntigravityToolsImport(false);
                     break;

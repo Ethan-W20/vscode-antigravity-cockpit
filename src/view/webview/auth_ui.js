@@ -16,12 +16,13 @@
             this.state = {
                 authorization: null,
                 antigravityToolsSyncEnabled: false,
-                antigravityToolsAutoSwitchEnabled: true
+                antigravityToolsAutoSwitchEnabled: true,
+                switchConfirmation: true
             };
             this.elements = {};
         }
 
-        updateState(authorization, antigravityToolsSyncEnabled, antigravityToolsAutoSwitchEnabled) {
+        updateState(authorization, antigravityToolsSyncEnabled, antigravityToolsAutoSwitchEnabled, switchConfirmation = true) {
             this.state.authorization = authorization;
             if (antigravityToolsSyncEnabled !== undefined) {
                 // Auto sync is intentionally forced off in UI.
@@ -29,6 +30,9 @@
             }
             if (antigravityToolsAutoSwitchEnabled !== undefined) {
                 this.state.antigravityToolsAutoSwitchEnabled = antigravityToolsAutoSwitchEnabled;
+            }
+            if (switchConfirmation !== undefined) {
+                this.state.switchConfirmation = switchConfirmation !== false;
             }
         }
 
@@ -241,7 +245,12 @@
                     e.stopPropagation();
                     const email = btn.dataset.email;
                     if (email) {
-                        this.showSwitchLoginConfirmModal(email);
+                        if (this.state.switchConfirmation === false) {
+                            this.vscode.postMessage({ command: 'autoTrigger.switchLoginAccount', email });
+                            document.getElementById('account-manage-modal')?.classList.add('hidden');
+                        } else {
+                            this.showSwitchLoginConfirmModal(email);
+                        }
                     }
                 })
             );
@@ -263,6 +272,12 @@
          * 显示切换登录确认弹窗
          */
         showSwitchLoginConfirmModal(email) {
+            if (this.state.switchConfirmation === false) {
+                this.vscode.postMessage({ command: 'autoTrigger.switchLoginAccount', email });
+                document.getElementById('account-manage-modal')?.classList.add('hidden');
+                return;
+            }
+
             let modal = document.getElementById('switch-login-confirm-modal');
             if (!modal) {
                 modal = this._createModal('switch-login-confirm-modal', `
@@ -272,9 +287,9 @@
                             <button class="close-btn" id="switch-login-confirm-close">×</button>
                         </div>
                         <div class="modal-body" style="padding: 20px;">
-                            <p style="margin-bottom: 10px;">${t('autoTrigger.switchLoginConfirmText') || '确定要切换到以下账户吗？'}</p>
+                            <p style="margin-bottom: 10px;">${t('autoTrigger.switchLoginConfirmText') || '确定切换到以下账户吗？'}</p>
                             <p style="font-weight: bold; color: var(--accent-color); margin-bottom: 15px;" id="switch-login-target-email"></p>
-                            <p style="color: var(--warning-color); font-size: 0.9em;">⚠️ ${t('autoTrigger.switchLoginWarning') || '此操作将重启 Antigravity 客户端以完成账户切换。'}</p>
+                            <p style="color: var(--warning-color); font-size: 0.9em;">${t('autoTrigger.switchLoginWarning') || '该操作将重启 Antigravity 客户端以完成账户切换。'}</p>
                         </div>
                         <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 15px 20px;">
                             <button class="at-btn at-btn-secondary" id="switch-login-confirm-cancel">${t('common.cancel') || '取消'}</button>

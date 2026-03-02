@@ -362,27 +362,74 @@ export function registerAccountTreeCommands(
         }),
     );
 
-    // Switch account (通过 WebSocket 请求 Cockpit Tools 执行真正的切换)
+    // Switch account
     context.subscriptions.push(
         vscode.commands.registerCommand('agCockpit.accountTree.switch', async (node: AccountNode) => {
-            // 🆕 二次确认对话框
-            const currentEmail = provider.getCurrentEmail();
-            const confirmMessage = currentEmail 
-                ? t('account.switch.confirmWithCurrent', { current: currentEmail, target: node.email })
-                : t('account.switch.confirmNoCurrent', { target: node.email });
-            
-            const confirm = await vscode.window.showWarningMessage(
-                confirmMessage,
-                { modal: true },  // 模态对话框，自动带有取消按钮
-                t('account.switch.confirmOk'),
-            );
-            
-            // 用户点击"取消"或关闭对话框
-            if (confirm !== t('account.switch.confirmOk')) {
-                return;  // 中止操作
+            const config = vscode.workspace.getConfiguration('agCockpit');
+            const useSeamless = config.get<boolean>('seamlessSwitchEnabled', true);
+            const needConfirm = config.get<boolean>('switchConfirmation', true);
+
+            if (needConfirm) {
+                const currentEmail = provider.getCurrentEmail();
+                const confirmMessage = currentEmail
+                    ? t('account.switch.confirmWithCurrent', { current: currentEmail, target: node.email })
+                    : t('account.switch.confirmNoCurrent', { target: node.email });
+
+                const confirm = await vscode.window.showWarningMessage(
+                    confirmMessage,
+                    { modal: true },
+                    t('account.switch.confirmOk'),
+                );
+
+                if (confirm !== t('account.switch.confirmOk')) {
+                    return;
+                }
             }
-            
-            // 1. 先从本地文件获取账号 ID（不依赖 WebSocket）
+
+            if (useSeamless) {
+                const { credentialStorage } = await import('../auto_trigger/credential_storage');
+                const { seamlessSwitchService } = await import('../services/seamlessSwitchService');
+                const credential = await credentialStorage.getCredentialForAccount(node.email);
+
+                if (!credential || !credential.refreshToken) {
+                    vscode.window.showWarningMessage(`无法无感换号：账号 ${node.email} 缺少凭据`);
+                    return;
+                }
+
+                const result = await seamlessSwitchService.switchTo({
+                    email: node.email,
+                    refreshToken: credential.refreshToken,
+                    tokenType: 'Bearer',
+                });
+
+                if (!result.success) {
+                    vscode.window.showErrorMessage(`无感换号失败：${result.error || '未知错误'}`);
+                    return;
+                }
+
+                await credentialStorage.setActiveAccount(node.email);
+
+                try {
+                    const osModule = await import('os');
+                    const pathModule = await import('path');
+                    const fsModule = await import('fs');
+                    const sharedDir = pathModule.join(osModule.homedir(), '.antigravity_cockpit');
+                    if (!fsModule.existsSync(sharedDir)) {
+                        fsModule.mkdirSync(sharedDir, { recursive: true });
+                    }
+                    fsModule.writeFileSync(
+                        pathModule.join(sharedDir, 'current_account.json'),
+                        JSON.stringify({ email: node.email, updated_at: Date.now() }),
+                    );
+                } catch (error) {
+                    logger.warn('[AccountTree] Failed to write current_account.json after seamless switch', error);
+                }
+
+                vscode.window.showInformationMessage(`已无感切换到账号：${node.email}`);
+                await provider.refresh();
+                return;
+            }
+
             const accountId = cockpitToolsLocal.getAccountIdByEmail(node.email);
             if (!accountId) {
                 vscode.window.showWarningMessage(t('accountTree.cannotGetAccountId'));

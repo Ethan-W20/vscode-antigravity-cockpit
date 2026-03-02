@@ -512,6 +512,17 @@ export class AccountsRefreshService {
         }
 
         this.currentEmail = currentEmail;
+
+        // Seamless switch does not go through Cockpit Tools current-account state.
+        const pluginActiveAccount = await credentialStorage.getActiveAccount();
+        if (pluginActiveAccount && pluginActiveAccount !== currentEmail && this.accounts.has(pluginActiveAccount)) {
+            this.currentEmail = pluginActiveAccount;
+            for (const [email, state] of this.accounts) {
+                state.isCurrent = email === pluginActiveAccount;
+            }
+            logger.info(`[AccountsRefresh] Use plugin active account as current: ${pluginActiveAccount}`);
+        }
+
         this.cleanupQuotaCache();
     }
 

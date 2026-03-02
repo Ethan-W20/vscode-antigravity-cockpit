@@ -264,6 +264,16 @@
           "type": "boolean",
           "default": false,
           "description": "Compatibility mode only (insecure): export OAuth access/refresh tokens to ~/.antigravity_cockpit/credentials.json in plaintext for legacy tools."
+        },
+        "agCockpit.seamlessSwitchEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable seamless account switch: inject OAuth token directly instead of relying on Cockpit Tools WebSocket switch."
+        },
+        "agCockpit.switchConfirmation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show confirmation dialog before switching account (Account Tree and dashboard account manager)."
         }
       }
     },

@@ -389,6 +389,8 @@ export type WebviewMessageType =
     | 'importFromLocal'
     | 'importFromTools'
     | 'exportAccounts'
+    | 'updateSeamlessSwitch'
+    | 'updateSwitchConfirmation'
     | 'openDashboard';
 
 /** Webview 消息 */
@@ -557,6 +559,8 @@ export interface DashboardConfig {
     antigravityToolsSyncEnabled?: boolean;
     /** 是否开启 AntigravityTools 自动切换（来自 globalState） */
     antigravityToolsAutoSwitchEnabled?: boolean;
+    seamlessSwitchEnabled?: boolean;
+    switchConfirmation?: boolean;
 }
 
 /** 状态栏更新数据 */

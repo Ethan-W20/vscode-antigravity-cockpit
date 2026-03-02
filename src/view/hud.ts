@@ -585,10 +585,10 @@ export class CockpitHUD {
             'addFirstAccount': t('accountsOverview.addFirstAccount') || 'Add your first account to get started',
             'noMatchTitle': t('accountsOverview.noMatchTitle') || 'No matching accounts',
             'noMatchDesc': t('accountsOverview.noMatchDesc') || 'No accounts match the current filters',
-            'switchConfirm': t('accountsOverview.switchConfirm') || 'Switch to this account?',
-            'switchWarning': t('accountsOverview.switchWarning') || 'This will restart Antigravity client to complete the switch.',
-            'confirm': t('common.confirm') || 'Confirm',
-            'cancel': t('common.cancel') || 'Cancel',
+            'switchConfirm': t('accountsOverview.switchConfirm') || '确定切换到该账户吗？',
+            'switchWarning': t('accountsOverview.switchWarning') || '该操作将重启 Antigravity 客户端以完成切换。',
+            'confirm': t('common.confirm') || '确认',
+            'cancel': t('common.cancel') || '取消',
             'close': t('common.close') || 'Close',
             'viewList': t('accountsOverview.viewList') || 'List',
             'viewGrid': t('accountsOverview.viewGrid') || 'Grid',
@@ -1444,6 +1444,22 @@ export class CockpitHUD {
                 </div>
 
                 <hr class="setting-divider">
+
+                <div class="setting-item">
+                    <label for="seamless-switch-enabled" class="checkbox-label">
+                        <input type="checkbox" id="seamless-switch-enabled" checked>
+                        <span>无感换号模式</span>
+                    </label>
+                    <p class="setting-hint">启用后切换账号将直接注入 OAuth Token，不依赖 Cockpit Tools WebSocket 切换。</p>
+                </div>
+
+                <div class="setting-item">
+                    <label for="switch-confirmation" class="checkbox-label">
+                        <input type="checkbox" id="switch-confirmation" checked>
+                        <span>换号确认弹窗</span>
+                    </label>
+                    <p class="setting-hint">统一控制“账号树切换”和“切换登录”两个场景的确认弹窗。</p>
+                </div>
 
                 <!-- 显示模式切换 -->
                 <div class="setting-item">
