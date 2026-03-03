@@ -189,7 +189,7 @@ export class AccountsRefreshService {
                 if (cockpitToolsWs.isConnected) {
                     await this.loadAccountsFromWebSocket();
                 } else {
-                    await this.loadAccountsFromSharedFile();
+                    await this.loadAccountsFromPluginStorage();
                 }
 
                 this.initialized = true;
@@ -526,7 +526,7 @@ export class AccountsRefreshService {
         this.cleanupQuotaCache();
     }
 
-    private async loadAccountsFromSharedFile(): Promise<void> {
+    private async loadAccountsFromPluginStorage(): Promise<void> {
         this.toolsAvailable = false;
 
         const credentials = await credentialStorage.getAllCredentials();
@@ -539,29 +539,12 @@ export class AccountsRefreshService {
             return;
         }
 
-        let currentEmailFromFile: string | null = null;
-        try {
-            const os = await import('os');
-            const path = await import('path');
-            const fs = await import('fs');
-
-            const sharedDir = path.join(os.homedir(), '.antigravity_cockpit');
-            const currentAccountFile = path.join(sharedDir, 'current_account.json');
-
-            if (fs.existsSync(currentAccountFile)) {
-                const content = fs.readFileSync(currentAccountFile, 'utf-8');
-                const data = JSON.parse(content) as { email?: string };
-                if (data.email && pluginEmails.includes(data.email)) {
-                    currentEmailFromFile = data.email;
-                }
-            }
-        } catch {
-            // ignore
-        }
+        const activeEmail = await credentialStorage.getActiveAccount();
+        const currentEmail = activeEmail && pluginEmails.includes(activeEmail) ? activeEmail : null;
 
         this.accounts.clear();
         for (const email of pluginEmails) {
-            const isCurrent = email === currentEmailFromFile;
+            const isCurrent = email === currentEmail;
             const credential = credentials[email];
             
             this.accounts.set(email, {
@@ -579,7 +562,7 @@ export class AccountsRefreshService {
             });
         }
 
-        this.currentEmail = currentEmailFromFile;
+        this.currentEmail = currentEmail;
         this.cleanupQuotaCache();
     }
 

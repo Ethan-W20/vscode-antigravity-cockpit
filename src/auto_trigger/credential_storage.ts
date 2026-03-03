@@ -7,9 +7,6 @@
  */
 
 import * as vscode from 'vscode';
-import * as os from 'os';
-import * as path from 'path';
-import * as fs from 'fs';
 import { OAuthCredential, AuthorizationStatus, AccountInfo } from './types';
 import { logger } from '../shared/log_service';
 
@@ -55,28 +52,6 @@ class CredentialStorage {
         this.migrationTask = this.migrateFromLegacy().catch(err => {
             logger.error(`[CredentialStorage] Migration failed: ${err.message}`);
         });
-        
-        // 初始化完成后同步到共享文件（供 Cockpit Tools 读取）
-        this.syncExistingCredentials();
-        
-        // 从共享目录读取当前账号，自动设置为活动账号
-        this.syncActiveAccountFromShared();
-    }
-    
-    /**
-     * 同步现有凭据到共享文件
-     */
-    private async syncExistingCredentials(): Promise<void> {
-        try {
-            await this.ensureMigrated();
-            const storage = await this.getCredentialsStorage();
-            if (Object.keys(storage.accounts).length > 0) {
-                await this.syncToSharedFile(storage);
-                logger.info('[CredentialStorage] Synced existing credentials to shared file');
-            }
-        } catch (error) {
-            // 忽略同步错误
-        }
     }
 
     /**
@@ -129,10 +104,7 @@ class CredentialStorage {
             const json = JSON.stringify(storage);
             await this.secretStorage!.store(CREDENTIALS_KEY, json);
             logger.info('[CredentialStorage] Credentials storage saved');
-            
-            // 同步到共享文件供 Cockpit Tools 读取
-            await this.syncToSharedFile(storage);
-            
+
             // 通过 WebSocket 通知 Cockpit Tools 数据已变更
             if (!options?.skipNotifyTools) {
                 this.notifyDataChanged();
@@ -246,104 +218,6 @@ class CredentialStorage {
     */
     
     /**
-     * 从共享目录读取当前账号，自动设置为活动账号
-     */
-    private async syncActiveAccountFromShared(): Promise<void> {
-        try {
-            await this.ensureMigrated();
-            
-            const sharedDir = this.getSharedDir();
-            const currentAccountFile = path.join(sharedDir, 'current_account.json');
-            
-            if (!fs.existsSync(currentAccountFile)) {
-                logger.info('[CredentialStorage] No current_account.json found in shared dir');
-                return;
-            }
-            
-            const content = fs.readFileSync(currentAccountFile, 'utf-8');
-            const data = JSON.parse(content) as { email: string; updated_at: number };
-            
-            if (!data.email) {
-                return;
-            }
-            
-            // 检查该账号是否存在
-            const hasAccount = await this.hasAccount(data.email);
-            if (!hasAccount) {
-                logger.info(`[CredentialStorage] Account ${data.email} from shared dir not found locally`);
-                return;
-            }
-            
-            // 检查是否已经是活动账号
-            const currentActive = await this.getActiveAccount();
-            if (currentActive === data.email) {
-                logger.info(`[CredentialStorage] Account ${data.email} is already active`);
-                return;
-            }
-            
-            // 设置为活动账号（不触发切换流程）
-            await this.setActiveAccount(data.email);
-            logger.info(`[CredentialStorage] Synced active account from shared dir: ${data.email}`);
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.warn(`[CredentialStorage] Failed to sync active account from shared: ${err.message}`);
-        }
-    }
-    
-    /**
-     * 获取共享目录路径（供 Cockpit Tools 读取）
-     */
-    private getSharedDir(): string {
-        return path.join(os.homedir(), '.antigravity_cockpit');
-    }
-    
-    /**
-     * 同步凭据到共享文件
-     * 供 Cockpit Tools 导入使用
-     */
-    private async syncToSharedFile(storage: CredentialsStorage): Promise<void> {
-        try {
-            const sharedDir = this.getSharedDir();
-            
-            // 确保目录存在
-            if (!fs.existsSync(sharedDir)) {
-                fs.mkdirSync(sharedDir, { recursive: true });
-            }
-            
-            const sharedFile = path.join(sharedDir, 'credentials.json');
-            
-            // 转换格式，只保存必要信息
-            const exportData: Record<string, {
-                email: string;
-                accessToken: string;
-                refreshToken: string;
-                expiresAt: string;
-                projectId?: string;
-            }> = {};
-            
-            for (const [email, cred] of Object.entries(storage.accounts)) {
-                // 跳过无效账号
-                if (cred.isInvalid) { continue; }
-                
-                exportData[email] = {
-                    email: cred.email || email,
-                    accessToken: cred.accessToken || '',
-                    refreshToken: cred.refreshToken || '',
-                    expiresAt: cred.expiresAt || '',
-                    projectId: cred.projectId,
-                };
-            }
-            
-            fs.writeFileSync(sharedFile, JSON.stringify({ accounts: exportData }, null, 2));
-            logger.debug('[CredentialStorage] Synced to shared file for Cockpit Tools');
-        } catch (error) {
-            // 同步失败不影响主流程
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.warn(`[CredentialStorage] Failed to sync to shared file: ${err.message}`);
-        }
-    }
-
-    /**
      * Check if an account with given email already exists
      */
     async hasAccount(email: string): Promise<boolean> {
@@ -418,6 +292,7 @@ class CredentialStorage {
 
         delete storage.accounts[email];
         await this.saveCredentialsStorage(storage, _skipNotifyTools ? { skipNotifyTools: true } : undefined);
+        await this.cleanupLegacyKeyForDeletedEmail(email);
 
         // If deleted account was active, set another as active
         const activeAccount = await this.getActiveAccount();
@@ -435,6 +310,30 @@ class CredentialStorage {
         // 通知 Cockpit Tools 删除账号
         if (!_skipNotifyTools) {
             this.deleteAccountFromCockpitTools(email);
+        }
+    }
+
+    /**
+     * 清理 legacy key 中已删除账号的残留数据
+     */
+    private async cleanupLegacyKeyForDeletedEmail(email: string): Promise<void> {
+        try {
+            const legacyJson = await this.secretStorage!.get(LEGACY_CREDENTIAL_KEY);
+            if (!legacyJson) {
+                return;
+            }
+
+            const legacyCredential = JSON.parse(legacyJson) as Partial<OAuthCredential>;
+            const legacyEmail = (legacyCredential.email || '').trim().toLowerCase();
+            const targetEmail = email.trim().toLowerCase();
+
+            if (legacyEmail && legacyEmail === targetEmail) {
+                await this.secretStorage!.delete(LEGACY_CREDENTIAL_KEY);
+                logger.info(`[CredentialStorage] Legacy key cleared for deleted account: ${email}`);
+            }
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.warn(`[CredentialStorage] Failed to cleanup legacy key for ${email}: ${err.message}`);
         }
     }
 

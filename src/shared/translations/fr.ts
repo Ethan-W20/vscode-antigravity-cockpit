@@ -593,9 +593,6 @@ export const fr = {
     // Added missing keys from en.ts
     'customGrouping.other': 'Autre',
     'customGrouping.smartGroupCount': 'Groupe auto : {count} groupes',
-    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
-    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
-    'common.dismiss': 'Dismiss',
     'groupNode.group': 'Groupe',
     'groupNode.quota': 'Quota',
     'groupNode.reset': 'Réinitialiser',

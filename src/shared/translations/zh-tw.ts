@@ -168,9 +168,6 @@ export const zhTW = {
     'customGrouping.emptyGroupWarning': '存在空分組，是否繼續保存？',
     'customGrouping.other': '其他',
     'customGrouping.smartGroupCount': '自動分組：共 {count} 個分組',
-    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
-    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
-    'common.dismiss': 'Dismiss',
 
     // 分組節點 Tooltip
     'groupNode.group': '分組',
