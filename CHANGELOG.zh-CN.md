@@ -8,6 +8,24 @@
 
 ---
 
+## [2.1.29] - 2026-03-03
+
+### 调整
+- **停用共享明文凭证桥接**：插件端不再向 `~/.antigravity_cockpit/credentials.json` / `~/.antigravity_cockpit/current_account.json` 导出，也不再从这两个文件读取。
+- **离线账号来源调整**：当 Cockpit Tools WebSocket 不可用时，账号列表与当前账号状态仅使用插件本地安全存储数据。
+- **删号时清理 legacy 残留**：删除账号时会额外清理对应的单账号 legacy key 残留数据。
+
+### 移除
+- **移除旧兼容设置项**：删除 `agCockpit.allowInsecureSharedCredentialExport` 配置项。
+
+### 翻译
+- **移除未使用翻译键**：删除各语言文件中未被业务代码使用的键：`customGrouping.ungroupedCount`、`customGrouping.newModelsDetected`、`common.dismiss`。
+
+### 说明
+- **跨端同步通道**：插件到 Cockpit Tools 的账号同步以 WebSocket 事件为主，本版本不再产出基于共享文件的凭证数据。
+
+---
+
 ## [2.1.28] - 2026-03-02
 
 ### 修复

@@ -583,9 +583,6 @@ export const tr = {
     // Added missing keys from en.ts
     'customGrouping.other': 'Diğer',
     'customGrouping.smartGroupCount': 'Otomatik Grup: {count} grup',
-    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
-    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
-    'common.dismiss': 'Dismiss',
     'groupNode.group': 'Grup',
     'groupNode.quota': 'Kota',
     'groupNode.reset': 'Sıfırla',

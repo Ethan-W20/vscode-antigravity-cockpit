@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "2.1.28",
+  "version": "2.1.29",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -259,11 +259,6 @@
           "type": "boolean",
           "default": false,
           "description": "Mask sensitive data (email, etc.) in the Plan Details panel."
-        },
-        "agCockpit.allowInsecureSharedCredentialExport": {
-          "type": "boolean",
-          "default": false,
-          "description": "Compatibility mode only (insecure): export OAuth access/refresh tokens to ~/.antigravity_cockpit/credentials.json in plaintext for legacy tools."
         }
       }
     },

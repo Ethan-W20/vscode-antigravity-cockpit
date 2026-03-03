@@ -630,9 +630,6 @@ export const vi = {
     // Added missing keys from en.ts
     'customGrouping.other': 'Khác',
     'customGrouping.smartGroupCount': 'Nhóm tự động: {count} nhóm',
-    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
-    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
-    'common.dismiss': 'Dismiss',
     'groupNode.group': 'Nhóm',
     'groupNode.quota': 'Hạn mức',
     'groupNode.reset': 'Đặt lại',

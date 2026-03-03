@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.29] - 2026-03-03
+
+### Changed
+- **Shared plaintext credential bridge disabled**: The extension no longer exports to or reads from `~/.antigravity_cockpit/credentials.json` and `~/.antigravity_cockpit/current_account.json`.
+- **Offline account source updated**: When Cockpit Tools WebSocket is unavailable, account list/current-account state now comes from extension local secure storage only.
+- **Legacy key cleanup on account delete**: Deleting an account now also clears the matching legacy single-account key residue.
+
+### Removed
+- **Legacy compatibility setting removed**: Deleted `agCockpit.allowInsecureSharedCredentialExport`.
+
+### i18n
+- **Removed unused translation keys**: Deleted unused keys `customGrouping.ungroupedCount`, `customGrouping.newModelsDetected`, and `common.dismiss` across locale files.
+
+### Notes
+- **Cross-end sync channel**: Plugin-to-Cockpit-Tools credential sync now relies on WebSocket channel events; this release no longer produces file-based shared credential data.
+
+---
+
 ## [2.1.28] - 2026-03-02
 
 ### Fixed
