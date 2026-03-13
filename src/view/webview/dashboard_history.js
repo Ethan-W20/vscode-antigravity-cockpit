@@ -558,7 +558,18 @@ export function createHistoryModule({
             return;
         }
 
-        const pointsDesc = getHistoryPoints().slice().sort((a, b) => b.timestamp - a.timestamp);
+        // 先计算每个点的 delta，只保留配额有实际变化的点
+        const allPointsDesc = getHistoryPoints().slice().sort((a, b) => b.timestamp - a.timestamp);
+        const pointsDesc = allPointsDesc.filter((point, index) => {
+            const nextPoint = allPointsDesc[index + 1];
+            if (!nextPoint) {
+                // 最旧的一条记录，保留
+                return true;
+            }
+            const delta = point.remainingPercentage - nextPoint.remainingPercentage;
+            return delta !== 0;
+        });
+
         const total = pointsDesc.length;
         const pageSize = historyState.pageSize;
         const totalPages = total > 0 ? Math.ceil(total / pageSize) : 0;
@@ -599,7 +610,7 @@ export function createHistoryModule({
                     <td>${formatHistoryPercent(point.remainingPercentage)}</td>
                     <td class="history-delta ${deltaClass}">${deltaText}</td>
                     <td>${formatHistoryTimestamp(point.resetTime)}</td>
-                    <td>${formatHistoryCountdownLabel(point.countdownSeconds, point.isStart, point.isReset)}</td>
+                    <td>${formatHistoryCountdown(point.countdownSeconds)}</td>
                 </tr>
             `;
         }).join('');
@@ -648,26 +659,6 @@ export function createHistoryModule({
         const days = Math.floor(totalHours / 24);
         const remainingHours = totalHours % 24;
         return `${days}d ${remainingHours}h ${remainingMinutes}m`;
-    }
-
-    function formatHistoryCountdownLabel(seconds, isStart, isReset) {
-        const text = formatHistoryCountdown(seconds);
-        if (!isStart && !isReset) {
-            return text;
-        }
-
-        let badges = '';
-        if (isStart) {
-            badges += '<span class="tag-start">START</span>';
-        }
-        if (isReset) {
-            badges += '<span class="tag-reset">RESET</span>';
-        }
-
-        if (text === '--') {
-            return badges;
-        }
-        return `${text} ${badges}`;
     }
 
     function formatHistoryTimestamp(timestamp) {
