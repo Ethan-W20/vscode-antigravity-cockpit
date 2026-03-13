@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.30] - 2026-03-13
+
+### Fixed
+- **"Invalid URL protocol" on local account import**: Fixed an error (`Import failed: Invalid URL protocol: the URL must start with 'http:' or 'https:'`) that occurred when using the "Import from Local DB" feature on certain systems or VS Code versions. The root cause was sql.js loading the `.wasm` file via `fetch()` in some environments, while the old code passed a bare filesystem path (no protocol prefix). The `locateFile` callback is now converted using `pathToFileURL()` to a standard `file://` URL, ensuring correct wasm loading on all platforms.
+
+### Improved
+- **Quota history deduplication**: The history details table now shows only data points where the quota percentage actually changed, filtering out duplicate entries with identical values for a cleaner trend view.
+- **History countdown format**: The countdown column in the history table now uses a unified compact format, consistent with other time displays.
+
+### Engineering
+- **sql.js initialization resilience**: The sql.js initialization Promise cache is now reset on failure, preventing subsequent calls from permanently reusing a failed Promise.
+
+---
+
 ## [2.1.29] - 2026-03-03
 
 ### Changed
