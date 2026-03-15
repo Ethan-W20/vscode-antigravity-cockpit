@@ -1497,7 +1497,7 @@ export class CockpitHUD {
                             额度 &gt; 60% → 每 3 分钟刷新<br>
                             额度 ≤ 60% → 每 2 分钟刷新<br>
                             额度 ≤ 40% → 每 30 秒刷新<br>
-                            额度 ≤ 20% → 每 15 秒刷新
+                            额度 ≤ 20% → 每 3 秒刷新（最后一档）
                         </p>
                     </div>
                     <div class="setting-item">

@@ -101,14 +101,17 @@ export function stopMonitoring(): void {
 
 /**
  * 根据当前额度百分比计算刷新间隔
+ * API 只返回 5 个档位：100% / 80% / 60% / 40% / 20% / 0%
+ * 20% 是耗尽前的最后一档，需要极高频轮询
+ *
  * - > 60%: 3 分钟
- * - <= 60%: 2 分钟
- * - <= 40%: 30 秒
- * - <= 20%: 15 秒
+ * - ≤ 60%: 2 分钟
+ * - ≤ 40%: 30 秒
+ * - ≤ 20%: 3 秒（最后一档，随时可能跳到 0%）
  */
 function getRefreshIntervalMs(lowestPct: number): number {
     if (lowestPct <= 20) {
-        return 15_000;     // 15秒
+        return 3_000;      // 3秒！最后一档，随时可能耗尽
     } else if (lowestPct <= 40) {
         return 30_000;     // 30秒
     } else if (lowestPct <= 60) {
@@ -342,7 +345,11 @@ function checkShouldSwitch(
         }
 
         const pct = model.remainingPercentage ?? 0;
-        if (pct <= threshold) {
+        // threshold=0 时，使用 isExhausted 标志（API返回的百分比可能不精确）
+        const isLow = threshold === 0
+            ? (model.isExhausted === true || pct <= 0)
+            : (pct <= threshold);
+        if (isLow) {
             lowModels.push(model.label ?? model.modelId ?? 'unknown');
         }
     }
@@ -371,6 +378,7 @@ function isCandidateSuitable(
     }
 
     const allModels = (snapshot as { allModels?: typeof snapshot.models }).allModels ?? snapshot.models;
+    let checkedCount = 0;
 
     for (const model of allModels) {
         if (monitoredModels.length > 0) {
@@ -381,14 +389,25 @@ function isCandidateSuitable(
                 continue;
             }
         }
+        checkedCount++;
 
         const pct = model.remainingPercentage ?? 0;
-        if (pct <= threshold) {
+        // threshold=0 时，使用 isExhausted 标志
+        const isLow = threshold === 0
+            ? (model.isExhausted === true || pct <= 0)
+            : (pct <= threshold);
+        if (isLow) {
             return false;
         }
     }
 
-    return true;
+    // 如果指定了监控模型但一个都没找到 → 不合适
+    if (monitoredModels.length > 0 && checkedCount === 0) {
+        logger.debug('[AutoSwitch] Candidate rejected: no monitored models found in snapshot');
+        return false;
+    }
+
+    return checkedCount > 0;
 }
 
 /**
