@@ -1416,7 +1416,17 @@ export class CockpitHUD {
                 </div>
                 
                 <hr class="setting-divider">
-                
+
+                <div class="setting-item">
+                    <label for="auto-refresh-startup" class="checkbox-label">
+                        <input type="checkbox" id="auto-refresh-startup" checked>
+                        <span>🔄 启动时自动刷新配额</span>
+                    </label>
+                    <p class="setting-hint">启用后每次 VS Code 启动时自动刷新所有账号配额数据。</p>
+                </div>
+
+                <hr class="setting-divider">
+
                 <div class="setting-item">
                     <label for="notification-enabled" class="checkbox-label">
                         <input type="checkbox" id="notification-enabled" checked>
@@ -1461,7 +1471,45 @@ export class CockpitHUD {
                     <p class="setting-hint">统一控制“账号树切换”和“切换登录”两个场景的确认弹窗。</p>
                 </div>
 
-                <!-- 显示模式切换 -->
+                <hr class="setting-divider">
+
+                <!-- 自动切号 -->
+                <div class="setting-item">
+                    <label for="auto-switch-enabled" class="checkbox-label">
+                        <input type="checkbox" id="auto-switch-enabled">
+                        <span>⚡ 额度自动切号</span>
+                    </label>
+                    <p class="setting-hint">当监控模型额度低于阈值时，自动切换到有额度的账号。</p>
+                </div>
+                <div id="auto-switch-options" class="setting-sub-options" style="display:none; margin-left: 16px;">
+                    <div class="setting-item">
+                        <label for="auto-switch-threshold">切号阈值</label>
+                        <select id="auto-switch-threshold" class="setting-select" style="width: auto;">
+                            <option value="0">0% (耗尽后切号)</option>
+                            <option value="20">20%</option>
+                            <option value="40">40%</option>
+                        </select>
+                        <p class="setting-hint">当监控模型剩余额度低于此值时触发自动切号。</p>
+                    </div>
+                    <div class="setting-item">
+                        <label>📊 监控刷新间隔（自动调速）</label>
+                        <p class="setting-hint" style="line-height: 1.6;">
+                            额度 &gt; 60% → 每 3 分钟刷新<br>
+                            额度 ≤ 60% → 每 2 分钟刷新<br>
+                            额度 ≤ 40% → 每 30 秒刷新<br>
+                            额度 ≤ 20% → 每 15 秒刷新
+                        </p>
+                    </div>
+                    <div class="setting-item">
+                        <label>监控模型</label>
+                        <p class="setting-hint">勾选需要监控的模型，留空则监控所有模型。</p>
+                        <div id="auto-switch-models" class="at-model-list" style="max-height: 200px; overflow-y: auto;">
+                            <div class="at-loading">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+
                 <div class="setting-item">
                     <label for="display-mode-select">🖥️ ${t('displayMode.title') || 'Display Mode'}</label>
                     <select id="display-mode-select" class="setting-select">

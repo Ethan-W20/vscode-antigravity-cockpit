@@ -113,6 +113,12 @@
         "title": "Debug Local Account (state.vscdb)",
         "category": "Antigravity",
         "icon": "$(bug)"
+      },
+      {
+        "command": "agCockpit.accountTree.refreshAccount",
+        "title": "Refresh This Account Quota",
+        "category": "Antigravity",
+        "icon": "$(sync)"
       }
     ],
     "keybindings": [
@@ -156,6 +162,11 @@
           "minimum": 10,
           "maximum": 3600,
           "description": "Interval in seconds to refresh quota data (10-3600)."
+        },
+        "agCockpit.autoRefreshOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh all account quotas when VS Code starts."
         },
         "agCockpit.logLevel": {
           "type": "string",
@@ -306,6 +317,10 @@
         {
           "command": "agCockpit.accountTree.loadAccountQuota",
           "when": "false"
+        },
+        {
+          "command": "agCockpit.accountTree.refreshAccount",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -322,9 +337,19 @@
       ],
       "view/item/context": [
         {
+          "command": "agCockpit.accountTree.refresh",
+          "when": "view == agCockpit.accountTree && viewItem == quotaSummary",
+          "group": "inline@1"
+        },
+        {
+          "command": "agCockpit.accountTree.refreshAccount",
+          "when": "view == agCockpit.accountTree && (viewItem == account || viewItem == accountCurrent)",
+          "group": "inline@1"
+        },
+        {
           "command": "agCockpit.accountTree.switch",
           "when": "view == agCockpit.accountTree && viewItem == account",
-          "group": "inline@1"
+          "group": "inline@2"
         },
         {
           "command": "agCockpit.accountTree.switch",

@@ -103,6 +103,7 @@ export class TelemetryController {
                 antigravityToolsAutoSwitchEnabled: configService.getStateFlag('antigravityToolsAutoSwitchEnabled', true),
                 seamlessSwitchEnabled: vscode.workspace.getConfiguration('agCockpit').get<boolean>('seamlessSwitchEnabled', true),
                 switchConfirmation: vscode.workspace.getConfiguration('agCockpit').get<boolean>('switchConfirmation', true),
+                autoRefreshOnStartup: vscode.workspace.getConfiguration('agCockpit').get<boolean>('autoRefreshOnStartup', true),
             });
 
             const snapshotEmail = snapshot.userInfo?.email;

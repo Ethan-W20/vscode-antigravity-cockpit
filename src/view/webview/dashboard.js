@@ -435,6 +435,10 @@ import { createAnnouncementModule } from './dashboard_announcements';
             if (seamlessCheckbox) seamlessCheckbox.checked = currentConfig.seamlessSwitchEnabled !== false;
             if (switchConfirmationCheckbox) switchConfirmationCheckbox.checked = currentConfig.switchConfirmation !== false;
 
+            // 启动自动刷新
+            const autoRefreshStartup = document.getElementById('auto-refresh-startup');
+            if (autoRefreshStartup) autoRefreshStartup.checked = currentConfig.autoRefreshOnStartup !== false;
+
             // Display Mode Select Logic (Webview vs QuickPick)
             const displayModeSelect = document.getElementById('display-mode-select');
             if (displayModeSelect) {
@@ -458,6 +462,9 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
             // 初始化即时保存事件
             initSettingsAutoSave();
+
+            // 请求自动切号配置
+            vscode.postMessage({ command: 'getAutoSwitchConfig' });
 
             settingsModal.classList.remove('hidden');
         }
@@ -534,6 +541,18 @@ import { createAnnouncementModule } from './dashboard_announcements';
             });
         }
 
+        // 启动自动刷新开关
+        const autoRefreshStartup = document.getElementById('auto-refresh-startup');
+        if (autoRefreshStartup) {
+            autoRefreshStartup.onchange = null;
+            autoRefreshStartup.addEventListener('change', () => {
+                vscode.postMessage({
+                    command: 'updateAutoRefreshOnStartup',
+                    enabled: autoRefreshStartup.checked
+                });
+            });
+        }
+
         // 阈值输入框失焦时自动钳位并保存
         if (warningInput) {
             warningInput.onblur = null;
@@ -566,6 +585,28 @@ import { createAnnouncementModule } from './dashboard_announcements';
                     command: 'updateSwitchConfirmation',
                     enabled: switchConfirmationCheckbox.checked
                 });
+            });
+        }
+
+        // 自动切号开关
+        const autoSwitchCheckbox = document.getElementById('auto-switch-enabled');
+        const autoSwitchOptions = document.getElementById('auto-switch-options');
+        if (autoSwitchCheckbox) {
+            autoSwitchCheckbox.onchange = null;
+            autoSwitchCheckbox.addEventListener('change', () => {
+                if (autoSwitchOptions) {
+                    autoSwitchOptions.style.display = autoSwitchCheckbox.checked ? 'block' : 'none';
+                }
+                saveAutoSwitchConfig();
+            });
+        }
+
+        // 自动切号阈值
+        const autoSwitchThreshold = document.getElementById('auto-switch-threshold');
+        if (autoSwitchThreshold) {
+            autoSwitchThreshold.onchange = null;
+            autoSwitchThreshold.addEventListener('change', () => {
+                saveAutoSwitchConfig();
             });
         }
     }
@@ -623,6 +664,70 @@ import { createAnnouncementModule } from './dashboard_announcements';
     function closeSettingsModal() {
         if (settingsModal) {
             settingsModal.classList.add('hidden');
+        }
+    }
+
+    /**
+     * 保存自动切号配置
+     */
+    function saveAutoSwitchConfig() {
+        const enabledCheckbox = document.getElementById('auto-switch-enabled');
+        const thresholdSelect = document.getElementById('auto-switch-threshold');
+        const modelsContainer = document.getElementById('auto-switch-models');
+
+        const monitoredModels = [];
+        if (modelsContainer) {
+            modelsContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                monitoredModels.push(cb.dataset.modelId);
+            });
+        }
+
+        vscode.postMessage({
+            command: 'updateAutoSwitchConfig',
+            config: {
+                enabled: enabledCheckbox?.checked ?? false,
+                threshold: parseInt(thresholdSelect?.value ?? '0', 10),
+                monitoredModels: monitoredModels,
+            }
+        });
+    }
+
+    /**
+     * 处理后端返回的自动切号配置
+     */
+    function handleAutoSwitchConfig(data) {
+        const enabledCheckbox = document.getElementById('auto-switch-enabled');
+        const thresholdSelect = document.getElementById('auto-switch-threshold');
+        const optionsContainer = document.getElementById('auto-switch-options');
+        const modelsContainer = document.getElementById('auto-switch-models');
+
+        if (enabledCheckbox) {
+            enabledCheckbox.checked = !!data.enabled;
+        }
+        if (thresholdSelect) {
+            thresholdSelect.value = String(data.threshold ?? 0);
+        }
+        if (optionsContainer) {
+            optionsContainer.style.display = data.enabled ? 'block' : 'none';
+        }
+
+        // 渲染模型列表
+        if (modelsContainer && data.availableModels) {
+            const monitored = data.monitoredModels || [];
+            modelsContainer.innerHTML = data.availableModels.map(m => {
+                const checked = monitored.includes(m.modelId) ? 'checked' : '';
+                return `<label class="at-model-item" style="display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer;">
+                    <input type="checkbox" data-model-id="${m.modelId}" ${checked} style="cursor: pointer;">
+                    <span>${m.displayName}</span>
+                </label>`;
+            }).join('');
+
+            // 绑定 checkbox 变更事件
+            modelsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    saveAutoSwitchConfig();
+                });
+            });
         }
     }
 
@@ -966,6 +1071,10 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 antigravityToolsAutoSwitchEnabled = message.data.autoSwitchEnabled;
             }
             updateQuotaAuthUI();
+        }
+
+        if (message.type === 'autoSwitchConfig') {
+            handleAutoSwitchConfig(message.data || {});
         }
 
         if (message.type === 'antigravityToolsSyncPrompt') {

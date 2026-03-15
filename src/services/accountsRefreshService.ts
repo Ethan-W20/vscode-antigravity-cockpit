@@ -9,6 +9,11 @@ import { QuotaSnapshot } from '../shared/types';
 import { t } from '../shared/i18n';
 import { recordQuotaHistory } from './quota_history';
 import { QuotaRefreshManager } from './quotaRefreshManager';
+import { runAutoSwitchIfNeeded } from './auto_switch_service';
+import { readQuotaApiCache } from './quota_api_cache';
+import { promises as fs } from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 export interface AccountQuotaCache {
     snapshot: QuotaSnapshot;
@@ -54,9 +59,38 @@ export class AccountsRefreshService {
     /** 配额刷新管理器（统一入口） */
     private readonly quotaRefreshManager: QuotaRefreshManager;
 
+    private static readonly TIER_FILE = path.join(os.homedir(), '.antigravity_cockpit', 'cache', 'account_tiers.json');
+
     constructor(private readonly reactor: ReactorCore) {
         this.quotaRefreshManager = new QuotaRefreshManager(reactor);
         this.scheduleNextAutoRefresh();
+    }
+
+    /** 保存 tier 映射到磁盘 */
+    private async saveTierMap(): Promise<void> {
+        try {
+            const tierMap: Record<string, string> = {};
+            for (const [email, acct] of this.accounts) {
+                if (acct.tier) {
+                    tierMap[email] = acct.tier;
+                }
+            }
+            const dir = path.dirname(AccountsRefreshService.TIER_FILE);
+            await fs.mkdir(dir, { recursive: true });
+            await fs.writeFile(AccountsRefreshService.TIER_FILE, JSON.stringify(tierMap), 'utf8');
+        } catch (err) {
+            logger.debug(`[AccountsRefresh] Failed to save tier map: ${err}`);
+        }
+    }
+
+    /** 从磁盘加载 tier 映射 */
+    private async loadTierMap(): Promise<Record<string, string>> {
+        try {
+            const content = await fs.readFile(AccountsRefreshService.TIER_FILE, 'utf8');
+            return JSON.parse(content);
+        } catch {
+            return {};
+        }
     }
 
     dispose(): void {
@@ -138,6 +172,18 @@ export class AccountsRefreshService {
     }
 
     async refreshOnStartup(waitMs: number = AccountsRefreshService.STARTUP_WS_WAIT_MS): Promise<void> {
+        // Check if auto-refresh on startup is enabled
+        const autoRefresh = vscode.workspace.getConfiguration('agCockpit').get<boolean>('autoRefreshOnStartup', true);
+        if (!autoRefresh) {
+            logger.info('[AccountsRefresh] autoRefreshOnStartup is disabled, loading from disk cache');
+            // Load account list but skip API quota refresh
+            await this.refresh({ reason: 'startup', skipQuotaRefresh: true });
+
+            // Try to load quota from disk cache (ignore TTL) for each account
+            await this.loadQuotasFromDiskCache();
+            return;
+        }
+
         if (this.startupRefreshPromise) {
             return this.startupRefreshPromise;
         }
@@ -169,6 +215,50 @@ export class AccountsRefreshService {
         })();
 
         return this.startupRefreshPromise;
+    }
+
+    /**
+     * 从磁盘缓存加载配额数据（忽略 TTL），用于禁用启动刷新时恢复上次数据
+     */
+    private async loadQuotasFromDiskCache(): Promise<void> {
+        let loaded = 0;
+        for (const [email, account] of this.accounts) {
+            if (!account.hasPluginCredential || account.isInvalid || account.isForbidden) {
+                continue;
+            }
+            try {
+                const cached = await readQuotaApiCache('authorized', email);
+                if (cached && cached.payload) {
+                    const snapshot = this.reactor.buildAuthorizedSnapshotFromResponse(
+                        cached.payload,
+                        cached.updatedAt,
+                    );
+                    this.quotaCache.set(email, {
+                        snapshot,
+                        fetchedAt: cached.updatedAt,
+                        loading: false,
+                        error: undefined,
+                    });
+                    // Update tier from cached snapshot
+                    if (snapshot.userInfo?.tier) {
+                        const acct = this.accounts.get(email);
+                        if (acct) {
+                            acct.tier = snapshot.userInfo.tier;
+                        }
+                    }
+                    loaded++;
+                }
+            } catch (err) {
+                logger.debug(`[AccountsRefresh] Failed to load disk cache for ${email}: ${err}`);
+            }
+        }
+        if (loaded > 0) {
+            logger.info(`[AccountsRefresh] Loaded ${loaded} accounts from disk cache (no API calls)`);
+            void this.saveTierMap();
+            this.emitUpdate();
+        } else {
+            logger.info('[AccountsRefresh] No disk cache found for any account');
+        }
     }
 
     async refresh(options?: { forceSync?: boolean; skipSync?: boolean; skipQuotaRefresh?: boolean; reason?: string; allowForbidden?: boolean }): Promise<void> {
@@ -330,6 +420,9 @@ export class AccountsRefreshService {
             }
             
             this.emitUpdate();
+
+            // 自动切号检查（在配额刷新完成后）
+            void runAutoSwitchIfNeeded(this);
         } finally {
             this.isRefreshingQuotas = false;
         }
@@ -484,6 +577,9 @@ export class AccountsRefreshService {
 
         this.accounts.clear();
 
+        // 加载保存的 tier 映射作为 fallback
+        const savedTiers = await this.loadTierMap();
+
         let currentEmail: string | null = null;
 
         for (const acc of toolsAccounts) {
@@ -501,7 +597,7 @@ export class AccountsRefreshService {
                 isCurrent,
                 hasDeviceBound: acc.has_fingerprint,
                 hasPluginCredential: pluginEmails.has(acc.email),
-                tier: this.extractTierFromAccount(acc as unknown as { [key: string]: unknown }),
+                tier: this.extractTierFromAccount(acc as unknown as { [key: string]: unknown }) || savedTiers[acc.email],
                 // 合并凭证异常状态
                 isInvalid: credential?.isInvalid ?? false,
                 invalidReason: credential?.isInvalid ? t('accountsRefresh.authExpired') : undefined,
@@ -677,6 +773,14 @@ export class AccountsRefreshService {
                 error: undefined,
             };
             this.quotaCache.set(email, cache);
+            // Update tier from quota data (more reliable than Cockpit Tools AccountInfo)
+            if (snapshot.userInfo?.tier) {
+                const acct = this.accounts.get(email);
+                if (acct) {
+                    acct.tier = snapshot.userInfo.tier;
+                    void this.saveTierMap();
+                }
+            }
             if (!fromApiCacheFile) {
                 void recordQuotaHistory(email, snapshot);
             }
