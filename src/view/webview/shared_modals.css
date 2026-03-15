@@ -101,6 +101,19 @@
     max-width: 450px;
 }
 
+/* Settings modal: constrain height + scrollable body */
+#settings-modal .modal-content {
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#settings-modal .modal-body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
 .modal-content-medium {
     max-width: 520px;
 }

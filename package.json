@@ -119,6 +119,12 @@
         "title": "Refresh This Account Quota",
         "category": "Antigravity",
         "icon": "$(sync)"
+      },
+      {
+        "command": "agCockpit.accountTree.sortByQuota",
+        "title": "Sort by Quota",
+        "category": "Antigravity",
+        "icon": "$(arrow-swap)"
       }
     ],
     "keybindings": [
@@ -321,6 +327,10 @@
         {
           "command": "agCockpit.accountTree.refreshAccount",
           "when": "false"
+        },
+        {
+          "command": "agCockpit.accountTree.sortByQuota",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -336,6 +346,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "agCockpit.accountTree.sortByQuota",
+          "when": "view == agCockpit.accountTree && viewItem == quotaSummary",
+          "group": "inline@0"
+        },
         {
           "command": "agCockpit.accountTree.refresh",
           "when": "view == agCockpit.accountTree && viewItem == quotaSummary",

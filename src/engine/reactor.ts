@@ -194,6 +194,18 @@ export class ReactorCore {
         }
     }
 
+    /**
+     * 直接注入一个快照并更新 UI（零 I/O，瞬间生效）
+     * 用于自动切号后立即显示新账号的数据
+     */
+    public injectSnapshot(snapshot: QuotaSnapshot): void {
+        this.lastSnapshot = snapshot;
+        this.lastSnapshotSource = 'authorized';
+        if (this.updateHandler) {
+            this.updateHandler(snapshot);
+        }
+    }
+
     public async tryUseQuotaCache(
         source: 'authorized' | 'local',
         email: string | null,

@@ -263,6 +263,7 @@ export class AccountTreeProvider implements vscode.TreeDataProvider<AccountTreeI
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
     private refreshSubscription: vscode.Disposable;
+    private sortByQuota = false;
 
     constructor(private readonly refreshService: AccountsRefreshService) {
         this.refreshSubscription = this.refreshService.onDidUpdate(() => {
@@ -294,6 +295,18 @@ export class AccountTreeProvider implements vscode.TreeDataProvider<AccountTreeI
      */
     async refresh(): Promise<void> {
         await this.refreshService.refresh();
+    }
+
+    /**
+     * 切换按额度排序
+     */
+    toggleSort(): void {
+        this.sortByQuota = !this.sortByQuota;
+        this._onDidChangeTreeData.fire();
+    }
+
+    isSortEnabled(): boolean {
+        return this.sortByQuota;
     }
 
     /**
@@ -358,9 +371,10 @@ export class AccountTreeProvider implements vscode.TreeDataProvider<AccountTreeI
         }
         rootItems.push(new ToolsStatusNode('', cockpitToolsWs.isConnected));
 
-        // 保持账号原始顺序，不按当前账号排序
+        // 收集账号节点
+        const accountNodes: AccountNode[] = [];
         for (const [email, account] of accounts) {
-            rootItems.push(
+            accountNodes.push(
                 new AccountNode(
                     email,
                     account.isCurrent,
@@ -371,7 +385,74 @@ export class AccountTreeProvider implements vscode.TreeDataProvider<AccountTreeI
             );
         }
 
+        // 按额度排序
+        if (this.sortByQuota) {
+            accountNodes.sort((a, b) => {
+                const aInfo = this.getAccountSortInfo(a.email);
+                const bInfo = this.getAccountSortInfo(b.email);
+                // 有额度的排前面，按额度从高到低
+                if (aInfo.minPct !== bInfo.minPct) {
+                    return bInfo.minPct - aInfo.minPct;
+                }
+                // 额度相同（都是0%）时，按重置时间从短到长
+                return aInfo.resetMs - bInfo.resetMs;
+            });
+        }
+
+        rootItems.push(...accountNodes);
+
         return rootItems;
+    }
+
+    /**
+     * 获取账号排序信息：最低额度 + 最短重置时间
+     */
+    private getAccountSortInfo(email: string): { minPct: number; resetMs: number } {
+        const cache = this.refreshService.getQuotaCache(email);
+        if (!cache || !cache.snapshot) {
+            return { minPct: -1, resetMs: Infinity }; // 无数据排最后
+        }
+        const allModels = (cache.snapshot as { allModels?: typeof cache.snapshot.models }).allModels ?? cache.snapshot.models ?? [];
+        if (allModels.length === 0) {
+            return { minPct: -1, resetMs: Infinity };
+        }
+
+        let minPct = 100;
+        let minResetMs = Infinity;
+
+        for (const model of allModels) {
+            const pct = model.remainingPercentage ?? 0;
+            if (pct < minPct) {
+                minPct = pct;
+            }
+            // 解析重置时间
+            const resetStr = model.timeUntilResetFormatted || '';
+            const ms = this.parseResetTime(resetStr);
+            if (ms < minResetMs) {
+                minResetMs = ms;
+            }
+        }
+
+        return { minPct, resetMs: minResetMs };
+    }
+
+    /**
+     * 解析重置时间字符串为毫秒 (e.g. "2h 30m" → 9000000)
+     */
+    private parseResetTime(s: string): number {
+        if (!s || s === '-') {
+            return Infinity;
+        }
+        let ms = 0;
+        const d = s.match(/(\d+)d/);
+        if (d) { ms += parseInt(d[1]) * 86400000; }
+        const h = s.match(/(\d+)h/);
+        if (h) { ms += parseInt(h[1]) * 3600000; }
+        const m = s.match(/(\d+)m/);
+        if (m) { ms += parseInt(m[1]) * 60000; }
+        const sec = s.match(/(\d+)s/);
+        if (sec) { ms += parseInt(sec[1]) * 1000; }
+        return ms || Infinity;
     }
 
     /**
@@ -511,6 +592,17 @@ export function registerAccountTreeCommands(
             // 手动触发重连
             cockpitToolsWs.ensureConnected();
             await provider.manualRefresh();
+        }),
+    );
+
+    // Sort by quota toggle
+    context.subscriptions.push(
+        vscode.commands.registerCommand('agCockpit.accountTree.sortByQuota', () => {
+            provider.toggleSort();
+            const enabled = provider.isSortEnabled();
+            vscode.window.showInformationMessage(
+                enabled ? '📊 按额度排序: 已开启' : '📊 按额度排序: 已关闭',
+            );
         }),
     );
 

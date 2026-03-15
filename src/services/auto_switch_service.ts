@@ -39,6 +39,17 @@ const AUTO_SWITCH_COOLDOWN_MS = 30_000; // 30 秒冷却期
 /** accountsService 引用，由 startMonitoring 设置 */
 let serviceRef: AccountsRefreshService | null = null;
 
+/** 切号完成后的回调（由 extension 注册，负责刷新 reactor/状态栏） */
+let onSwitchedCallback: (() => void) | null = null;
+
+/**
+ * 注册切号完成后的回调
+ * 由 extension.ts 调用，传入 reactor.tryUseQuotaCache + syncTelemetry 逻辑
+ */
+export function setOnSwitchedCallback(cb: () => void): void {
+    onSwitchedCallback = cb;
+}
+
 /**
  * 获取自动切号配置
  */
@@ -192,7 +203,8 @@ async function runMonitorCycle(accountsService: AccountsRefreshService): Promise
 
     autoSwitchInProgress = true;
     try {
-        const currentEmail = accountsService.getCurrentEmail();
+        // 用 credentialStorage 获取最新的当前账号（不用 accountsService.getCurrentEmail()，它可能是 stale 的）
+        const currentEmail = await credentialStorage.getActiveAccount();
         if (!currentEmail) {
             return;
         }
@@ -300,6 +312,32 @@ async function rotateToNextAvailable(
             logger.info(`[AutoSwitch] ✅ Switching to ${candidateEmail}`);
             await credentialStorage.setActiveAccount(candidateEmail);
             lastAutoSwitchAt = Date.now();
+
+            // 写入 current_account.json（跨实例同步）
+            try {
+                const osModule = await import('os');
+                const pathModule = await import('path');
+                const fsModule = await import('fs');
+                const sharedDir = pathModule.join(osModule.homedir(), '.antigravity_cockpit');
+                if (!fsModule.existsSync(sharedDir)) {
+                    fsModule.mkdirSync(sharedDir, { recursive: true });
+                }
+                fsModule.writeFileSync(
+                    pathModule.join(sharedDir, 'current_account.json'),
+                    JSON.stringify({ email: candidateEmail, updated_at: Date.now() }),
+                );
+            } catch (err2) {
+                logger.warn(`[AutoSwitch] Failed to write current_account.json: ${err2}`);
+            }
+
+            // 刷新 UI（触发 reactor 重新拉取新账号配额）
+            if (onSwitchedCallback) {
+                try {
+                    onSwitchedCallback();
+                } catch (err3) {
+                    logger.warn(`[AutoSwitch] Post-switch callback error: ${err3}`);
+                }
+            }
 
             // 通知用户
             vscode.window.showInformationMessage(
