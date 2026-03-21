@@ -8,6 +8,27 @@
 
 ---
 
+## [2.1.32] - 2026-03-21
+
+### 修复
+- **WSL 中文 Windows 用户目录导入失败**：当扩展运行在 VS Code Remote - WSL 中时，读取 Windows `%APPDATA%` 现已改为 Unicode 安全的命令路径，避免本地账号导入时数据库路径退化成 `/mnt/c/Users/???/...` 这类乱码路径。
+
+### 工程
+- **WSL 路径规范化回归覆盖**：WSL 场景下解析出的 `state.vscdb` 路径现在会保持 POSIX 分隔符，并补充了非 ASCII Windows 用户目录的回归测试。
+
+---
+
+## [2.1.31] - 2026-03-21
+
+### 修复
+- **WSL 本地账号导入路径**：当扩展运行在 VS Code Remote - WSL 中时，`导入本地账户` / 账号同步中的本地导入现在会解析 Windows 侧 Antigravity 客户端数据库（`%APPDATA%/Antigravity/User/globalStorage/state.vscdb`），不再误读远端扩展宿主自己的存储路径。
+- **Dark High Contrast 分组按钮对比度**：`Manage Groups` 按钮在 `Dark High Contrast` 主题下现在会保持浅色可读文本。
+
+### 工程
+- **WSL 路径回归测试**：补充了 `state.vscdb` 在 WSL 与非 WSL 场景下的路径解析测试，防止后续回归。
+
+---
+
 ## [2.1.30] - 2026-03-13
 
 ### 修复

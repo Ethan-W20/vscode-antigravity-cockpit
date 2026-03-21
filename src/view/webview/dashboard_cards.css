@@ -986,7 +986,7 @@
     gap: 6px;
     padding: 6px 14px;
     background: var(--card-bg);
-    color: var(--accent);
+    color: var(--text-primary);
     border: 1px solid var(--accent);
     border-radius: 6px;
     cursor: pointer;
@@ -1001,7 +1001,7 @@
 
 .auto-group-link:hover {
     background: var(--accent);
-    color: white;
+    color: var(--vscode-button-foreground, white);
     /* 悬停变为实心 */
     box-shadow: 0 4px 12px rgba(47, 129, 247, 0.3);
     transform: translateY(-1px);
