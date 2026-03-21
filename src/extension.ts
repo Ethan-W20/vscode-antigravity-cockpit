@@ -8,7 +8,7 @@ import * as path from 'path';
 import { ProcessHunter } from './engine/hunter';
 import { ReactorCore } from './engine/reactor';
 import { logger } from './shared/log_service';
-import { setAntigravityUserDataDir } from './shared/antigravity_paths';
+import { setAntigravityRemoteName, setAntigravityUserDataDir } from './shared/antigravity_paths';
 import { configService, CockpitConfig } from './shared/config_service';
 import { t, i18n, normalizeLocaleInput } from './shared/i18n';
 import { CockpitHUD } from './view/hud';
@@ -72,8 +72,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // 记录当前实例的 user-data-dir（用于读取正确的 state.vscdb）
     try {
         const userDataDir = path.resolve(context.globalStorageUri.fsPath, '..', '..', '..');
+        setAntigravityRemoteName(vscode.env.remoteName ?? null);
         setAntigravityUserDataDir(userDataDir);
-        logger.info(`[Startup] Resolved user-data-dir: ${userDataDir}`);
+        logger.info(`[Startup] Resolved user-data-dir: ${userDataDir}, remote=${vscode.env.remoteName ?? 'local'}`);
     } catch (err) {
         logger.warn(`[Startup] Failed to resolve user-data-dir: ${err instanceof Error ? err.message : String(err)}`);
     }

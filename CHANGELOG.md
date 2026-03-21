@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.31] - 2026-03-21
+
+### Fixed
+- **WSL local account import path**: When the extension runs in VS Code Remote - WSL, `Import Local Account` / Account Sync local import now resolves the Windows-side Antigravity client database (`%APPDATA%/Antigravity/User/globalStorage/state.vscdb`) instead of reading the remote extension host storage path.
+- **Dark High Contrast grouping action contrast**: The `Manage Groups` button now keeps a light, readable label in the `Dark High Contrast` theme.
+
+### Engineering
+- **WSL path regression coverage**: Added tests to lock the `state.vscdb` resolution behavior for WSL and non-WSL environments.
+
+---
+
 ## [2.1.30] - 2026-03-13
 
 ### Fixed
