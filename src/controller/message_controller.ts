@@ -17,6 +17,7 @@ import { cockpitToolsLocal } from '../services/cockpitToolsLocal';
 import { getQuotaHistory, clearHistory, clearAllHistory } from '../services/quota_history';
 import { oauthService } from '../auto_trigger';
 import { AccountsRefreshService } from '../services/accountsRefreshService';
+import { getAutoSwitchConfig, saveAutoSwitchConfig } from '../services/auto_switch_service';
 
 export class MessageController {
     // 跟踪已通知的模型以避免重复弹窗 (虽然主要逻辑在 TelemetryController，但 CheckAndNotify 可能被消息触发吗? 不, 主要是 handleMessage)
@@ -418,6 +419,72 @@ export class MessageController {
                         this.reactor.reprocess();
                     }
                     break;
+
+                case 'updateSeamlessSwitch':
+                    if (message.enabled !== undefined) {
+                        const enabled = Boolean(message.enabled);
+                        logger.info(`User changed seamless switch to: ${enabled}`);
+                        await vscode.workspace.getConfiguration('agCockpit').update(
+                            'seamlessSwitchEnabled',
+                            enabled,
+                            vscode.ConfigurationTarget.Global,
+                        );
+                    }
+                    break;
+
+                case 'updateSwitchConfirmation':
+                    if (message.enabled !== undefined) {
+                        const enabled = Boolean(message.enabled);
+                        logger.info(`User changed account-tree switch confirmation to: ${enabled}`);
+                        await vscode.workspace.getConfiguration('agCockpit').update(
+                            'switchConfirmation',
+                            enabled,
+                            vscode.ConfigurationTarget.Global,
+                        );
+                    }
+                    break;
+
+                case 'updateAutoRefreshOnStartup':
+                    if (message.enabled !== undefined) {
+                        const enabled = Boolean(message.enabled);
+                        logger.info(`User changed autoRefreshOnStartup to: ${enabled}`);
+                        await vscode.workspace.getConfiguration('agCockpit').update(
+                            'autoRefreshOnStartup',
+                            enabled,
+                            vscode.ConfigurationTarget.Global,
+                        );
+                    }
+                    break;
+
+                case 'updateAutoSwitchConfig':
+                    if (message.config) {
+                        const cfg = message.config as { enabled?: boolean; threshold?: number; monitoredModels?: string[] };
+                        await saveAutoSwitchConfig({
+                            enabled: Boolean(cfg.enabled),
+                            threshold: typeof cfg.threshold === 'number' ? cfg.threshold : 0,
+                            monitoredModels: Array.isArray(cfg.monitoredModels) ? cfg.monitoredModels : [],
+                        });
+                        logger.info(`[AutoSwitch] Config updated: enabled=${cfg.enabled}, threshold=${cfg.threshold}%`);
+                    }
+                    break;
+
+                case 'getAutoSwitchConfig': {
+                    const autoSwitchCfg = getAutoSwitchConfig();
+                    // 从 reactor 获取所有可用模型（未过滤的）用于 UI 选择
+                    const latestSnap = this.reactor.getLatestSnapshot();
+                    const allModelIds = (latestSnap?.allModels ?? latestSnap?.models ?? []).map(m => ({
+                        modelId: m.modelId ?? m.label ?? '',
+                        displayName: m.label ?? m.modelId ?? '',
+                    }));
+                    this.hud.sendMessage({
+                        type: 'autoSwitchConfig',
+                        data: {
+                            ...autoSwitchCfg,
+                            availableModels: allModelIds,
+                        },
+                    });
+                    break;
+                }
 
                 case 'antigravityToolsSync.import':
                     await this.handleAntigravityToolsImport(false);

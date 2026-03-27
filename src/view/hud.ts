@@ -585,10 +585,10 @@ export class CockpitHUD {
             'addFirstAccount': t('accountsOverview.addFirstAccount') || 'Add your first account to get started',
             'noMatchTitle': t('accountsOverview.noMatchTitle') || 'No matching accounts',
             'noMatchDesc': t('accountsOverview.noMatchDesc') || 'No accounts match the current filters',
-            'switchConfirm': t('accountsOverview.switchConfirm') || 'Switch to this account?',
-            'switchWarning': t('accountsOverview.switchWarning') || 'This will restart Antigravity client to complete the switch.',
-            'confirm': t('common.confirm') || 'Confirm',
-            'cancel': t('common.cancel') || 'Cancel',
+            'switchConfirm': t('accountsOverview.switchConfirm') || '确定切换到该账户吗？',
+            'switchWarning': t('accountsOverview.switchWarning') || '该操作将重启 Antigravity 客户端以完成切换。',
+            'confirm': t('common.confirm') || '确认',
+            'cancel': t('common.cancel') || '取消',
             'close': t('common.close') || 'Close',
             'viewList': t('accountsOverview.viewList') || 'List',
             'viewGrid': t('accountsOverview.viewGrid') || 'Grid',
@@ -1416,7 +1416,17 @@ export class CockpitHUD {
                 </div>
                 
                 <hr class="setting-divider">
-                
+
+                <div class="setting-item">
+                    <label for="auto-refresh-startup" class="checkbox-label">
+                        <input type="checkbox" id="auto-refresh-startup" checked>
+                        <span>🔄 启动时自动刷新配额</span>
+                    </label>
+                    <p class="setting-hint">启用后每次 VS Code 启动时自动刷新所有账号配额数据。</p>
+                </div>
+
+                <hr class="setting-divider">
+
                 <div class="setting-item">
                     <label for="notification-enabled" class="checkbox-label">
                         <input type="checkbox" id="notification-enabled" checked>
@@ -1445,7 +1455,61 @@ export class CockpitHUD {
 
                 <hr class="setting-divider">
 
-                <!-- 显示模式切换 -->
+                <div class="setting-item">
+                    <label for="seamless-switch-enabled" class="checkbox-label">
+                        <input type="checkbox" id="seamless-switch-enabled" checked>
+                        <span>无感换号模式</span>
+                    </label>
+                    <p class="setting-hint">启用后切换账号将直接注入 OAuth Token，不依赖 Cockpit Tools WebSocket 切换。</p>
+                </div>
+
+                <div class="setting-item">
+                    <label for="switch-confirmation" class="checkbox-label">
+                        <input type="checkbox" id="switch-confirmation" checked>
+                        <span>换号确认弹窗</span>
+                    </label>
+                    <p class="setting-hint">统一控制“账号树切换”和“切换登录”两个场景的确认弹窗。</p>
+                </div>
+
+                <hr class="setting-divider">
+
+                <!-- 自动切号 -->
+                <div class="setting-item">
+                    <label for="auto-switch-enabled" class="checkbox-label">
+                        <input type="checkbox" id="auto-switch-enabled">
+                        <span>⚡ 额度自动切号</span>
+                    </label>
+                    <p class="setting-hint">当监控模型额度低于阈值时，自动切换到有额度的账号。</p>
+                </div>
+                <div id="auto-switch-options" class="setting-sub-options" style="display:none; margin-left: 16px;">
+                    <div class="setting-item">
+                        <label for="auto-switch-threshold">切号阈值</label>
+                        <select id="auto-switch-threshold" class="setting-select" style="width: auto;">
+                            <option value="0">0% (耗尽后切号)</option>
+                            <option value="20">20%</option>
+                            <option value="40">40%</option>
+                        </select>
+                        <p class="setting-hint">当监控模型剩余额度低于此值时触发自动切号。</p>
+                    </div>
+                    <div class="setting-item">
+                        <label>📊 监控刷新间隔（自动调速）</label>
+                        <p class="setting-hint" style="line-height: 1.6;">
+                            额度 &gt; 60% → 每 3 分钟刷新<br>
+                            额度 ≤ 60% → 每 2 分钟刷新<br>
+                            额度 ≤ 40% → 每 30 秒刷新<br>
+                            额度 ≤ 20% → 每 3 秒刷新（最后一档）
+                        </p>
+                    </div>
+                    <div class="setting-item">
+                        <label>监控模型</label>
+                        <p class="setting-hint">勾选需要监控的模型，留空则监控所有模型。</p>
+                        <div id="auto-switch-models" class="at-model-list" style="max-height: 200px; overflow-y: auto;">
+                            <div class="at-loading">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+
                 <div class="setting-item">
                     <label for="display-mode-select">🖥️ ${t('displayMode.title') || 'Display Mode'}</label>
                     <select id="display-mode-select" class="setting-select">

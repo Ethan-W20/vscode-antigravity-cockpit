@@ -427,9 +427,17 @@ import { createAnnouncementModule } from './dashboard_announcements';
             const notificationCheckbox = document.getElementById('notification-enabled');
             const warningInput = document.getElementById('warning-threshold');
             const criticalInput = document.getElementById('critical-threshold');
+            const seamlessCheckbox = document.getElementById('seamless-switch-enabled');
+            const switchConfirmationCheckbox = document.getElementById('switch-confirmation');
             if (notificationCheckbox) notificationCheckbox.checked = currentConfig.notificationEnabled !== false;
             if (warningInput) warningInput.value = currentConfig.warningThreshold || 30;
             if (criticalInput) criticalInput.value = currentConfig.criticalThreshold || 10;
+            if (seamlessCheckbox) seamlessCheckbox.checked = currentConfig.seamlessSwitchEnabled !== false;
+            if (switchConfirmationCheckbox) switchConfirmationCheckbox.checked = currentConfig.switchConfirmation !== false;
+
+            // 启动自动刷新
+            const autoRefreshStartup = document.getElementById('auto-refresh-startup');
+            if (autoRefreshStartup) autoRefreshStartup.checked = currentConfig.autoRefreshOnStartup !== false;
 
             // Display Mode Select Logic (Webview vs QuickPick)
             const displayModeSelect = document.getElementById('display-mode-select');
@@ -454,6 +462,9 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
             // 初始化即时保存事件
             initSettingsAutoSave();
+
+            // 请求自动切号配置
+            vscode.postMessage({ command: 'getAutoSwitchConfig' });
 
             settingsModal.classList.remove('hidden');
         }
@@ -516,6 +527,8 @@ import { createAnnouncementModule } from './dashboard_announcements';
         const notificationCheckbox = document.getElementById('notification-enabled');
         const warningInput = document.getElementById('warning-threshold');
         const criticalInput = document.getElementById('critical-threshold');
+        const seamlessCheckbox = document.getElementById('seamless-switch-enabled');
+        const switchConfirmationCheckbox = document.getElementById('switch-confirmation');
 
         // 通知开关即时保存
         if (notificationCheckbox) {
@@ -524,6 +537,18 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 vscode.postMessage({
                     command: 'updateNotificationEnabled',
                     notificationEnabled: notificationCheckbox.checked
+                });
+            });
+        }
+
+        // 启动自动刷新开关
+        const autoRefreshStartup = document.getElementById('auto-refresh-startup');
+        if (autoRefreshStartup) {
+            autoRefreshStartup.onchange = null;
+            autoRefreshStartup.addEventListener('change', () => {
+                vscode.postMessage({
+                    command: 'updateAutoRefreshOnStartup',
+                    enabled: autoRefreshStartup.checked
                 });
             });
         }
@@ -540,6 +565,48 @@ import { createAnnouncementModule } from './dashboard_announcements';
             criticalInput.onblur = null;
             criticalInput.addEventListener('blur', () => {
                 clampAndSaveThresholds();
+            });
+        }
+
+        if (seamlessCheckbox) {
+            seamlessCheckbox.onchange = null;
+            seamlessCheckbox.addEventListener('change', () => {
+                vscode.postMessage({
+                    command: 'updateSeamlessSwitch',
+                    enabled: seamlessCheckbox.checked
+                });
+            });
+        }
+
+        if (switchConfirmationCheckbox) {
+            switchConfirmationCheckbox.onchange = null;
+            switchConfirmationCheckbox.addEventListener('change', () => {
+                vscode.postMessage({
+                    command: 'updateSwitchConfirmation',
+                    enabled: switchConfirmationCheckbox.checked
+                });
+            });
+        }
+
+        // 自动切号开关
+        const autoSwitchCheckbox = document.getElementById('auto-switch-enabled');
+        const autoSwitchOptions = document.getElementById('auto-switch-options');
+        if (autoSwitchCheckbox) {
+            autoSwitchCheckbox.onchange = null;
+            autoSwitchCheckbox.addEventListener('change', () => {
+                if (autoSwitchOptions) {
+                    autoSwitchOptions.style.display = autoSwitchCheckbox.checked ? 'block' : 'none';
+                }
+                saveAutoSwitchConfig();
+            });
+        }
+
+        // 自动切号阈值
+        const autoSwitchThreshold = document.getElementById('auto-switch-threshold');
+        if (autoSwitchThreshold) {
+            autoSwitchThreshold.onchange = null;
+            autoSwitchThreshold.addEventListener('change', () => {
+                saveAutoSwitchConfig();
             });
         }
     }
@@ -597,6 +664,70 @@ import { createAnnouncementModule } from './dashboard_announcements';
     function closeSettingsModal() {
         if (settingsModal) {
             settingsModal.classList.add('hidden');
+        }
+    }
+
+    /**
+     * 保存自动切号配置
+     */
+    function saveAutoSwitchConfig() {
+        const enabledCheckbox = document.getElementById('auto-switch-enabled');
+        const thresholdSelect = document.getElementById('auto-switch-threshold');
+        const modelsContainer = document.getElementById('auto-switch-models');
+
+        const monitoredModels = [];
+        if (modelsContainer) {
+            modelsContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                monitoredModels.push(cb.dataset.modelId);
+            });
+        }
+
+        vscode.postMessage({
+            command: 'updateAutoSwitchConfig',
+            config: {
+                enabled: enabledCheckbox?.checked ?? false,
+                threshold: parseInt(thresholdSelect?.value ?? '0', 10),
+                monitoredModels: monitoredModels,
+            }
+        });
+    }
+
+    /**
+     * 处理后端返回的自动切号配置
+     */
+    function handleAutoSwitchConfig(data) {
+        const enabledCheckbox = document.getElementById('auto-switch-enabled');
+        const thresholdSelect = document.getElementById('auto-switch-threshold');
+        const optionsContainer = document.getElementById('auto-switch-options');
+        const modelsContainer = document.getElementById('auto-switch-models');
+
+        if (enabledCheckbox) {
+            enabledCheckbox.checked = !!data.enabled;
+        }
+        if (thresholdSelect) {
+            thresholdSelect.value = String(data.threshold ?? 0);
+        }
+        if (optionsContainer) {
+            optionsContainer.style.display = data.enabled ? 'block' : 'none';
+        }
+
+        // 渲染模型列表
+        if (modelsContainer && data.availableModels) {
+            const monitored = data.monitoredModels || [];
+            modelsContainer.innerHTML = data.availableModels.map(m => {
+                const checked = monitored.includes(m.modelId) ? 'checked' : '';
+                return `<label class="at-model-item" style="display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer;">
+                    <input type="checkbox" data-model-id="${m.modelId}" ${checked} style="cursor: pointer;">
+                    <span>${m.displayName}</span>
+                </label>`;
+            }).join('');
+
+            // 绑定 checkbox 变更事件
+            modelsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    saveAutoSwitchConfig();
+                });
+            });
         }
     }
 
@@ -940,6 +1071,10 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 antigravityToolsAutoSwitchEnabled = message.data.autoSwitchEnabled;
             }
             updateQuotaAuthUI();
+        }
+
+        if (message.type === 'autoSwitchConfig') {
+            handleAutoSwitchConfig(message.data || {});
         }
 
         if (message.type === 'antigravityToolsSyncPrompt') {
@@ -1868,7 +2003,12 @@ import { createAnnouncementModule } from './dashboard_announcements';
         const activeEmail = activeAccount || (accounts.length > 0 ? accounts[0].email : null);
 
         if (authUi) {
-            authUi.updateState(auth, antigravityToolsSyncEnabled, antigravityToolsAutoSwitchEnabled);
+            authUi.updateState(
+                auth,
+                antigravityToolsSyncEnabled,
+                antigravityToolsAutoSwitchEnabled,
+                currentConfig.switchConfirmation !== false,
+            );
             authUi.renderAuthRow(row, {
                 showSyncToggleInline: false,
             });
@@ -2086,7 +2226,12 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 e.stopPropagation();
                 const email = btn.dataset.email;
                 if (email) {
-                    showSwitchLoginConfirmModal(email);
+                    if (currentConfig.switchConfirmation === false) {
+                        vscode.postMessage({ command: 'autoTrigger.switchLoginAccount', email });
+                        closeAccountManageModal();
+                    } else {
+                        showSwitchLoginConfirmModal(email);
+                    }
                 }
             });
         });
@@ -2107,6 +2252,12 @@ import { createAnnouncementModule } from './dashboard_announcements';
      * 显示切换登录确认弹窗
      */
     function showSwitchLoginConfirmModal(email) {
+        if (currentConfig.switchConfirmation === false) {
+            vscode.postMessage({ command: 'autoTrigger.switchLoginAccount', email });
+            closeAccountManageModal();
+            return;
+        }
+
         // 创建确认弹窗
         let modal = document.getElementById('switch-login-confirm-modal');
         if (!modal) {
@@ -2120,9 +2271,9 @@ import { createAnnouncementModule } from './dashboard_announcements';
                         <button class="modal-close" id="switch-login-confirm-close">×</button>
                     </div>
                     <div class="modal-body" style="padding: 20px;">
-                        <p style="margin-bottom: 10px;">${i18n['autoTrigger.switchLoginConfirmText'] || '确定要切换到以下账户吗？'}</p>
+                        <p style="margin-bottom: 10px;">${i18n['autoTrigger.switchLoginConfirmText'] || '确定切换到以下账户吗？'}</p>
                         <p style="font-weight: bold; color: var(--accent-color); margin-bottom: 15px;" id="switch-login-target-email"></p>
-                        <p style="color: var(--warning-color); font-size: 0.9em;">⚠️ ${i18n['autoTrigger.switchLoginWarning'] || '此操作将重启 Antigravity 客户端以完成账户切换。'}</p>
+                        <p style="color: var(--warning-color); font-size: 0.9em;">${i18n['autoTrigger.switchLoginWarning'] || '该操作将重启 Antigravity 客户端以完成账户切换。'}</p>
                     </div>
                     <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 15px 20px;">
                         <button class="at-btn at-btn-secondary" id="switch-login-confirm-cancel">${i18n['common.cancel'] || '取消'}</button>

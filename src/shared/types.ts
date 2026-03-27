@@ -389,6 +389,11 @@ export type WebviewMessageType =
     | 'importFromLocal'
     | 'importFromTools'
     | 'exportAccounts'
+    | 'updateSeamlessSwitch'
+    | 'updateSwitchConfirmation'
+    | 'updateAutoRefreshOnStartup'
+    | 'updateAutoSwitchConfig'
+    | 'getAutoSwitchConfig'
     | 'openDashboard';
 
 /** Webview 消息 */
@@ -470,6 +475,8 @@ export interface WebviewMessage {
     emails?: string[];
     /** 模式 (addAccount) */
     mode?: string;
+    /** 自动切号配置 (updateAutoSwitchConfig) */
+    config?: unknown;
 }
 
 /** 调度配置 */
@@ -557,6 +564,9 @@ export interface DashboardConfig {
     antigravityToolsSyncEnabled?: boolean;
     /** 是否开启 AntigravityTools 自动切换（来自 globalState） */
     antigravityToolsAutoSwitchEnabled?: boolean;
+    seamlessSwitchEnabled?: boolean;
+    switchConfirmation?: boolean;
+    autoRefreshOnStartup?: boolean;
 }
 
 /** 状态栏更新数据 */

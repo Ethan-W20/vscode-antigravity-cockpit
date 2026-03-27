@@ -14,6 +14,7 @@ import { t, i18n, normalizeLocaleInput } from './shared/i18n';
 import { CockpitHUD } from './view/hud';
 import { QuickPickView } from './view/quickpick_view';
 import { AccountsRefreshService } from './services/accountsRefreshService';
+import { setOnSwitchedCallback } from './services/auto_switch_service';
 
 // Controllers
 import { StatusBarController } from './controller/status_bar_controller';
@@ -119,6 +120,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     hud = new CockpitHUD(context.extensionUri, context, accountsRefreshService);
     quickPickView = new QuickPickView();
     lastQuotaSource = configService.getConfig().quotaSource === 'authorized' ? 'authorized' : 'local';
+
+    // 注册自动切号后的 UI 刷新回调
+    setOnSwitchedCallback(() => {
+        reactor.syncTelemetry();
+    });
 
     // 注册账号总览命令
     context.subscriptions.push(

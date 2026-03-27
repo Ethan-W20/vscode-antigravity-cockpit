@@ -113,6 +113,18 @@
         "title": "Debug Local Account (state.vscdb)",
         "category": "Antigravity",
         "icon": "$(bug)"
+      },
+      {
+        "command": "agCockpit.accountTree.refreshAccount",
+        "title": "Refresh This Account Quota",
+        "category": "Antigravity",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "agCockpit.accountTree.sortByQuota",
+        "title": "Sort by Quota",
+        "category": "Antigravity",
+        "icon": "$(arrow-swap)"
       }
     ],
     "keybindings": [
@@ -156,6 +168,11 @@
           "minimum": 10,
           "maximum": 3600,
           "description": "Interval in seconds to refresh quota data (10-3600)."
+        },
+        "agCockpit.autoRefreshOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh all account quotas when VS Code starts."
         },
         "agCockpit.logLevel": {
           "type": "string",
@@ -259,6 +276,21 @@
           "type": "boolean",
           "default": false,
           "description": "Mask sensitive data (email, etc.) in the Plan Details panel."
+        },
+        "agCockpit.allowInsecureSharedCredentialExport": {
+          "type": "boolean",
+          "default": false,
+          "description": "Compatibility mode only (insecure): export OAuth access/refresh tokens to ~/.antigravity_cockpit/credentials.json in plaintext for legacy tools."
+        },
+        "agCockpit.seamlessSwitchEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable seamless account switch: inject OAuth token directly instead of relying on Cockpit Tools WebSocket switch."
+        },
+        "agCockpit.switchConfirmation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show confirmation dialog before switching account (Account Tree and dashboard account manager)."
         }
       }
     },
@@ -291,6 +323,14 @@
         {
           "command": "agCockpit.accountTree.loadAccountQuota",
           "when": "false"
+        },
+        {
+          "command": "agCockpit.accountTree.refreshAccount",
+          "when": "false"
+        },
+        {
+          "command": "agCockpit.accountTree.sortByQuota",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -307,9 +347,24 @@
       ],
       "view/item/context": [
         {
+          "command": "agCockpit.accountTree.sortByQuota",
+          "when": "view == agCockpit.accountTree && viewItem == quotaSummary",
+          "group": "inline@0"
+        },
+        {
+          "command": "agCockpit.accountTree.refresh",
+          "when": "view == agCockpit.accountTree && viewItem == quotaSummary",
+          "group": "inline@1"
+        },
+        {
+          "command": "agCockpit.accountTree.refreshAccount",
+          "when": "view == agCockpit.accountTree && (viewItem == account || viewItem == accountCurrent)",
+          "group": "inline@1"
+        },
+        {
           "command": "agCockpit.accountTree.switch",
           "when": "view == agCockpit.accountTree && viewItem == account",
-          "group": "inline@1"
+          "group": "inline@2"
         },
         {
           "command": "agCockpit.accountTree.switch",
