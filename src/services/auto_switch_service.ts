@@ -310,6 +310,32 @@ async function rotateToNextAvailable(
         if (isCandidateSuitable(candidateCache, config.threshold, config.monitoredModels)) {
             // 找到了！执行切换
             logger.info(`[AutoSwitch] ✅ Switching to ${candidateEmail}`);
+
+            // If seamless switch is enabled, inject the new token into the LS
+            // so it stays in sync with the plugin's active account.
+            const useSeamless = vscode.workspace.getConfiguration('agCockpit')
+                .get<boolean>('seamlessSwitchEnabled', true);
+            if (useSeamless) {
+                try {
+                    const { seamlessSwitchService } = await import('./seamlessSwitchService');
+                    const credential = await credentialStorage.getCredentialForAccount(candidateEmail);
+                    if (credential?.refreshToken) {
+                        const result = await seamlessSwitchService.switchTo({
+                            email: candidateEmail,
+                            refreshToken: credential.refreshToken,
+                            tokenType: 'Bearer',
+                        });
+                        if (!result.success) {
+                            logger.warn(`[AutoSwitch] Seamless switch failed for ${candidateEmail}: ${result.error}, continuing with plugin-only switch`);
+                        } else {
+                            logger.info(`[AutoSwitch] Seamless token injection succeeded for ${candidateEmail}`);
+                        }
+                    }
+                } catch (err) {
+                    logger.warn(`[AutoSwitch] Seamless switch error: ${err}`);
+                }
+            }
+
             await credentialStorage.setActiveAccount(candidateEmail);
             lastAutoSwitchAt = Date.now();
 

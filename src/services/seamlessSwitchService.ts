@@ -1,11 +1,10 @@
 import * as fs from 'fs';
 import * as https from 'https';
-import * as os from 'os';
-import * as path from 'path';
 import * as querystring from 'querystring';
 import * as vscode from 'vscode';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { logger } from '../shared/log_service';
+import { getAntigravityStateDbPath } from '../shared/antigravity_paths';
 
 const ANTIGRAVITY_CLIENT_ID = '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
 const ANTIGRAVITY_CLIENT_SECRET = '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';
@@ -59,6 +58,9 @@ interface BetterSqlite3Database {
 }
 
 export class SeamlessSwitchService {
+    /** Promise-based mutex – serialises concurrent switchTo() calls so
+     *  we never hammer setOAuthTokenInfo / state.vscdb in parallel. */
+    private switchLock: Promise<void> = Promise.resolve();
     private encodeVarint(value: number): Buffer {
         const bytes: number[] = [];
         let v = value >>> 0;
@@ -115,16 +117,10 @@ export class SeamlessSwitchService {
         return outer.toString('base64');
     }
 
+    /** Delegates to the shared path resolver that handles WSL,
+     *  --user-data-dir overrides, and all three platforms. */
     private getStateDbPath(): string {
-        const homeDir = os.homedir();
-        if (process.platform === 'win32') {
-            const appData = process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming');
-            return path.join(appData, 'Antigravity', 'User', 'globalStorage', 'state.vscdb');
-        }
-        if (process.platform === 'darwin') {
-            return path.join(homeDir, 'Library', 'Application Support', 'Antigravity', 'User', 'globalStorage', 'state.vscdb');
-        }
-        return path.join(homeDir, '.config', 'Antigravity', 'User', 'globalStorage', 'state.vscdb');
+        return getAntigravityStateDbPath();
     }
 
     private async writeToStateDb(
@@ -146,6 +142,9 @@ export class SeamlessSwitchService {
             const DatabaseCtor = require('better-sqlite3') as new (dbPath: string) => BetterSqlite3Database;
             const db = new DatabaseCtor(dbPath);
             try {
+                // LS holds a WAL lock on this file; set busy_timeout to wait
+                // instead of failing immediately with SQLITE_BUSY.
+                (db as unknown as { pragma: (s: string) => void }).pragma('busy_timeout = 3000');
                 const stmt = db.prepare('INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)');
                 stmt.run(UNIFIED_STATE_KEY, newValue);
             } finally {
@@ -160,8 +159,10 @@ export class SeamlessSwitchService {
         try {
             const escapedValue = newValue.replace(/'/g, "''");
             const escapedKey = UNIFIED_STATE_KEY.replace(/'/g, "''");
-            const sql = `INSERT OR REPLACE INTO ItemTable (key, value) VALUES ('${escapedKey}', '${escapedValue}');`;
-            execSync(`sqlite3 "${dbPath}" "${sql}"`, { timeout: 5000, windowsHide: true });
+            // .timeout 3000 tells sqlite3 CLI to retry for up to 3s when the db is locked by LS.
+            // Use execFileSync (no shell) with stdin to avoid command-injection via dbPath.
+            const sql = `.timeout 3000\nINSERT OR REPLACE INTO ItemTable (key, value) VALUES ('${escapedKey}', '${escapedValue}');\n`;
+            execFileSync('sqlite3', [dbPath], { input: sql, timeout: 8000, windowsHide: true });
             logger.info('[SeamlessSwitch] Persisted token to state.vscdb via sqlite3 CLI');
             return;
         } catch {
@@ -231,6 +232,16 @@ export class SeamlessSwitchService {
     }
 
     async switchTo(account: SeamlessSwitchAccount): Promise<SeamlessSwitchResult> {
+        // Serialise via mutex – prevents two concurrent switches from
+        // hammering setOAuthTokenInfo and state.vscdb at the same time.
+        return new Promise<SeamlessSwitchResult>((resolve) => {
+            this.switchLock = this.switchLock.then(() =>
+                this.doSwitchTo(account).then(resolve),
+            );
+        });
+    }
+
+    private async doSwitchTo(account: SeamlessSwitchAccount): Promise<SeamlessSwitchResult> {
         try {
             const vsc = vscode as VSCodeWithAntigravityAuth;
             const authApi = vsc.antigravityAuth;
@@ -272,13 +283,7 @@ export class SeamlessSwitchService {
             }
 
             await authApi.setOAuthTokenInfo(tokenInfo);
-            logger.info('[SeamlessSwitch] OAuth token injected successfully');
-
-            try {
-                await this.writeToStateDb(refreshed.accessToken, tokenType, account.refreshToken, expirySeconds);
-            } catch (error) {
-                logger.warn('[SeamlessSwitch] Failed to persist token into state.vscdb', error);
-            }
+            logger.info('[SeamlessSwitch] OAuth token injected successfully (in-memory only, skipping state.vscdb to avoid LS restart)');
 
             return { success: true };
         } catch (error) {
